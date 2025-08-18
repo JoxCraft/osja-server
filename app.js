@@ -559,26 +559,37 @@ ui.payConfirm.addEventListener('click', async ()=>{
 ui.friends.addEventListener('click', (e)=>{
   const target = e.target.closest('.member');
   if (!target) return;
+  // nur eine Gesamtauswahl: Freunde wählen => Gegner-Auswahl löschen
+  ui.enemies.querySelectorAll('.member').forEach(el=>el.classList.remove('selected'));
   ui.friends.querySelectorAll('.member').forEach(el=>el.classList.remove('selected'));
   target.classList.add('selected');
   selectedChar = { side: "me", kind: target.dataset.kind, index: parseInt(target.dataset.index,10) };
+  // Rechte Spalte neu aufbauen
+  renderState(lastState);
 });
 
 ui.enemies.addEventListener('click', (e)=>{
   const target = e.target.closest('.member');
   if (!target) return;
+  // nur eine Gesamtauswahl: Gegner wählen => Freunde-Auswahl löschen
+  ui.friends.querySelectorAll('.member').forEach(el=>el.classList.remove('selected'));
   ui.enemies.querySelectorAll('.member').forEach(el=>el.classList.remove('selected'));
   target.classList.add('selected');
   selectedChar = { side: "opp", kind: target.dataset.kind, index: parseInt(target.dataset.index,10) };
+  renderState(lastState);
 });
+
 
 ui.charAttacks.addEventListener('click', (e)=>{
   const atk = e.target.closest('.atk');
   if (!atk) return;
+  // Nur eigene Attacken anwählbar
+  if (!selectedChar || selectedChar.side !== "me") return;
   ui.charAttacks.querySelectorAll('.atk').forEach(el=>el.classList.remove('selected'));
   atk.classList.add('selected');
   selectedAttackIndex = parseInt(atk.dataset.attackIndex ?? "-1", 10);
 });
+
 
 ui.passBtn.addEventListener('click', async ()=>{
   if (isHost) {
