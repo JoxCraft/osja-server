@@ -128,6 +128,14 @@ async function initAbly(lobbyCode, name) {
     await channel.publish("rpc-resp", { reqId, res });
   });
 
+    // Let clients request the pool again if needed
+  channel.subscribe("pool-req", async () => {
+    if (isHost && pyReady) {
+      const pool = await Host.call("get_pool", { lobby_code: lobbyCode, phase: 1, rangeleien: false });
+      await broadcast("pool", { pool, rangeleien: false });
+    }
+  });
+
   // Host wartet auf zweiten Spieler, dann Lobby erstellen & Pool senden
   if (isHost) {
     presence.subscribe('enter', async () => {
@@ -397,6 +405,11 @@ ui.joinBtn.addEventListener('click', async () => {
   await initAbly(lobbyCode, localName);
   showScreen(1);
   broadcast("msg", { text: `${localName} ist beigetreten.` });
+    // If I'm not host, ask host to resend the pool
+  if (!isHost) {
+    await broadcast("pool-req", {});
+  }
+
 });
 
 // ------------------------
