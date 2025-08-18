@@ -5,10 +5,15 @@ import engine as eng
 
 def _ensure_tmp(lobby: eng.Lobby):
     # pro Lobby ein Puffer:
-    #   player_name -> {"base": [Attacke], "rgl": [Attacke] | None, "complete": bool}
+    #   pid (int) -> {"base": [Attacke], "rgl": [Attacke] | None, "complete": bool}
     if not hasattr(lobby, "_tmp"):
         lobby._tmp = {}
 
+def _player_id_by_name(lobby: eng.Lobby, player_name: str) -> int:
+    for c in lobby.clients:
+        if c.spieler.name == player_name:
+            return c.spieler.spieler_id
+    raise RuntimeError(f"player not found: {player_name!r}")
 # --- Resolver relativ zur Besitzer-Perspektive (owner_id) ---
 def _resolve_char_rel(lobby: eng.Lobby, owner_id: int, sel: dict):
     side = sel.get("side")
@@ -149,10 +154,10 @@ _paid = {}
 
 def submit_attacks(lobby_code: str, player_name: str, picks: list[str], rangeleien: bool = False):
     lobby = get_lobby(lobby_code)
-    c = _client_by_name(lobby, player_name)
+    pid = _player_id_by_name(lobby, player_name)  # 0 oder 1
     _ensure_tmp(lobby)
 
-    # Namen -> Attacke-Objekte (gefiltert nach type 0/1 je nach Phase)
+    # Namen -> Attacke-Objekte (gefiltert nach Phase)
     chosen: list[eng.Attacke] = []
     for n in picks:
         matches = [a for a in ATTACKS if a.name == n and ((not rangeleien and a.type == 0) or (rangeleien and a.type == 1))]
@@ -160,36 +165,33 @@ def submit_attacks(lobby_code: str, player_name: str, picks: list[str], rangelei
             raise RuntimeError(f"submit_attacks: unknown or mismatched attack name {n!r}")
         chosen.append(matches[0])
 
-    entry = lobby._tmp.get(player_name, {"base": [], "rgl": None, "complete": False})
+    entry = lobby._tmp.get(pid, {"base": [], "rgl": None, "complete": False})
 
     if not rangeleien:
         # Erste Abgabe: normale Attacken merken
         entry["base"] = chosen
         entry["rgl"] = None
-        # Wenn "Immer vorbereitet" dabei ist, wartet dieser Spieler noch auf Rangeleien
+        # Falls "Immer vorbereitet" gewählt wurde, ist dieser Spieler noch NICHT fertig
         entry["complete"] = not any(a.name == "Immer vorbereitet" for a in chosen)
     else:
-        # Zweite Abgabe: Rangeleien nur erlaubt, wenn vorher "Immer vorbereitet" in base
+        # Zweite Abgabe (Rangeleien) nur erlaubt, wenn "Immer vorbereitet" in base ist
+        if not entry["base"]:
+            raise RuntimeError("Zuerst normale Attacken wählen, dann Rangeleien.")
         if not any(a.name == "Immer vorbereitet" for a in entry["base"]):
             raise RuntimeError("Rangeleien können nur gewählt werden, wenn 'Immer vorbereitet' unter den normalen Attacken gewählt wurde.")
         entry["rgl"] = chosen
         entry["complete"] = True
 
-    lobby._tmp[player_name] = entry
+    lobby._tmp[pid] = entry
 
-    # Wenn beide Spieler fertig sind (je nach Auswahl mit/ohne Rangeleien):
-    if len(lobby.clients) == 2 and all(lobby._tmp.get(cl.spieler.name, {}).get("complete", False) for cl in lobby.clients):
-        p1 = lobby._tmp[lobby.clients[0].spieler.name]
-        p2 = lobby._tmp[lobby.clients[1].spieler.name]
+    # Wenn beide fertig sind → genau EINMAL an die Engine übergeben
+    if len(lobby.clients) == 2 and all(lobby._tmp.get(cl.spieler.spieler_id, {}).get("complete", False) for cl in lobby.clients):
+        p0 = lobby._tmp[0]
+        p1 = lobby._tmp[1]
+        atken0 = (p0["base"] or []) + (p0["rgl"] or [])
         atken1 = (p1["base"] or []) + (p1["rgl"] or [])
-        atken2 = (p2["base"] or []) + (p2["rgl"] or [])
-
-        # EINMAL zentral in die Engine übernehmen
-        eng.atk_entschieden(lobby, lobby.clients[0], atken1, lobby.clients[1], atken2)
-
-        # Aufräumen
-        del lobby._tmp
-
+        eng.atk_entschieden(lobby, lobby.clients[0], atken0, lobby.clients[1], atken1)
+        del lobby._tmp  # aufräumen
     return True
 
 def set_flags(lobby_code:str, player_name:str, start:bool, end:bool, react:bool):
