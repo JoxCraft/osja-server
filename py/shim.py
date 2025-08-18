@@ -128,8 +128,7 @@ async def submit_pay(lobby_code:str, player_name:str, amount:int):
     lobby = get_lobby(lobby_code)
     c = _client_by_name(lobby, player_name)
     _paid[player_name] = max(0, int(amount))
-    if len(lobby.clients) == 2 and all(name in _paid for name in (lobby.clients[0].spieler.name, lobby.clients[1].spieler.name)):
-        # Beide haben bezahlt → jetzt ASYNC die Engine-Funktion awaiten
+    if len(lobby.clients) == 2 and all(n in _paid for n in (lobby.clients[0].spieler.name, lobby.clients[1].spieler.name)):
         await eng.leben_zahlen(
             lobby,
             lobby.clients[0], _paid[lobby.clients[0].spieler.name],
@@ -138,14 +137,16 @@ async def submit_pay(lobby_code:str, player_name:str, amount:int):
         _paid.clear()
     return True
 
+
 # ---------- UI-Aktionen Kampf ----------
-def ui_pass(lobby_code:str, player_name:str):
+async def ui_pass(lobby_code: str, player_name: str):
     lobby = get_lobby(lobby_code)
     c = _client_by_name(lobby, player_name)
     if lobby.priority == c.spieler.spieler_id:
-        eng.passen(lobby)
+        await eng.passen(lobby)  # <<< WICHTIG: await
         return True
     return False
+
 
 def _resolve_char(lobby:eng.Lobby, path:dict) -> eng.Spieler|eng.Monster:
     side = path["side"]  # "me" oder "opp"
@@ -159,7 +160,7 @@ def _resolve_char(lobby:eng.Lobby, path:dict) -> eng.Spieler|eng.Monster:
     else:
         return owner.monster[index]
 
-def ui_play(lobby_code:str, player_name:str, char:dict, attack_index:int):
+async def ui_play(lobby_code:str, player_name:str, char:dict, attack_index:int):
     lobby = get_lobby(lobby_code)
     c = _client_by_name(lobby, player_name)
     if lobby.priority != c.spieler.spieler_id:
@@ -171,7 +172,7 @@ def ui_play(lobby_code:str, player_name:str, char:dict, attack_index:int):
         ab = target.stats.attacken[attack_index]
     except Exception:
         return False
-    asyncio.create_task(eng.attacke_gewählt(lobby, target, ab))
+    await eng.attacke_gewählt(lobby, target, ab)  # <<< await
     return True
 
 # ---------- Snapshot ----------
@@ -252,6 +253,7 @@ def lobby_snapshot(lobby_code:str):
         })
 
     # Me / Opp only once starting is defined (after payment)
+        # Me / Opp nur, wenn starting definiert ist
     if has_start:
         me = lobby.clients[lobby.starting].spieler
         opp = lobby.clients[(lobby.starting - 1) % 2].spieler
@@ -259,7 +261,8 @@ def lobby_snapshot(lobby_code:str):
         state["me"]["monsters"] = [_ser_member(f"Monster {i+1}", m.stats, False) for i, m in enumerate(me.monster)]
         state["opp"] = _ser_member(opp.name, opp.stats, True)
         state["opp"]["monsters"] = [_ser_member(f"Monster {i+1}", m.stats, False) for i, m in enumerate(opp.monster)]
-        state["opp_known"] = [_ser_attackebesitz(ab) for ab in lobby.clients[me.spieler_id].spieler.atk_known]
+        # Bekannte gegnerische Attacken sind auf "me.atk_known" notiert
+        state["opp_known"] = [_ser_attackebesitz(ab) for ab in me.atk_known]
     else:
         # early phases: still show both players minimally if present
         if len(lobby.clients) >= 1:
