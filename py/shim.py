@@ -2,6 +2,7 @@
 import asyncio
 from typing import Any
 import engine as eng
+from __future__ import annotations
 
 # ---------- Cleanup: stale lobbies löschen ----------
 def cleanup_lobbies():
