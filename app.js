@@ -63,6 +63,16 @@ function phaseLabel(turntime, reaction) {
   return map[idx] + (reaction ? " (Reaktion)" : "");
 }
 
+
+// JSON-safe Python call (ensures we get plain JS objects, not PyProxy)
+async function pyCallJSON(name, args = {}) {
+  const s = await pyodide.runPythonAsync(`
+import json
+json.dumps(${name}(**js.args))
+  `, { globals: { js: { args } } });
+  return JSON.parse(s);
+}
+
 // ------------------------
 // Ably Init + Lobby Join
 // ------------------------
@@ -238,11 +248,10 @@ json.dumps(lobby_snapshot(js.lobbyCode))
     `, { globals: { js: { lobbyCode: ui.lobby.value.trim() } } });
     return JSON.parse(state);
   },
-  async call(name, args = {}) {
-    return pyodide.runPythonAsync(`
-res = ${name}(**js.args)
-res
-    `, { globals: { js: { args } } });
+    async call(name, args = {}) {
+    return pyCallJSON(name, args);
+  }
+
   }
 };
 
