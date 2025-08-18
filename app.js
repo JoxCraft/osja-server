@@ -169,20 +169,60 @@ function broadcast(type, data) {
 // ------------------------
 // Pyodide Host-Ladung
 // ------------------------
+
 async function loadPyodideAndEngine() {
   pyodide = await loadPyodide({ indexURL: "https://cdn.jsdelivr.net/pyodide/v0.24.1/full/" });
-  const engine = await fetch(PY_ENGINE_PATH).then(r => r.text());
-  const shim = await fetch(PY_SHIM_PATH).then(r => r.text());
+
+  // --- fetch engine.py ---
+  const engRes = await fetch(PY_ENGINE_PATH);
+  if (!engRes.ok) {
+    log(`[Host][ERROR] fetch ${PY_ENGINE_PATH} failed: ${engRes.status} ${engRes.statusText}`);
+    throw new Error("engine.py fetch failed");
+  }
+  const engine = await engRes.text();
+  if (!engine.trim()) {
+    log(`[Host][ERROR] ${PY_ENGINE_PATH} is empty. Check your path or file content.`);
+    throw new Error("engine.py is empty");
+  }
+
+  // --- fetch shim.py ---
+  const shimRes = await fetch(PY_SHIM_PATH);
+  if (!shimRes.ok) {
+    log(`[Host][ERROR] fetch ${PY_SHIM_PATH} failed: ${shimRes.status} ${shimRes.statusText}`);
+    throw new Error("shim.py fetch failed");
+  }
+  const shim = await shimRes.text();
+  if (!shim.trim()) {
+    log(`[Host][ERROR] ${PY_SHIM_PATH} is empty. Check your path or file content.`);
+    throw new Error("shim.py is empty");
+  }
+
+  // write files into FS
   pyodide.FS.mkdirTree("/py");
   pyodide.FS.writeFile("/py/engine.py", engine);
   pyodide.FS.writeFile("/py/shim.py", shim);
+
+  // import shim (which imports engine)
   await pyodide.runPythonAsync(`
 import sys
 sys.path.append("/py")
 from shim import *
   `);
+
+  // sanity-check from Python side: how many Attacke are registered?
+  const regInfoJSON = await pyodide.runPythonAsync(`
+import json
+json.dumps(debug_registry())
+  `);
+  const regInfo = JSON.parse(regInfoJSON);
+  log(\`[Host] engine Attacke registry count: \${regInfo.count}\`);
+  if (regInfo.count === 0) {
+    log("[Host][ERROR] No Attacke found. engine.py likely not loaded or wrong file.");
+  }
+
   pyReady = true;
 }
+
 
 // ------------------------
 // Host: Python-Brücke
