@@ -192,26 +192,26 @@ def _ser_member(name, s:eng.Stats, is_player=True):
         "attacks": [_ser_attackebesitz(ab) for ab in s.attacken]
     }
 
-def lobby_snapshot(lobby_code:str):
+def _ser_player(sp: eng.Spieler):
+    data = _ser_member(sp.name, sp.stats, True)
+    data["monsters"] = [_ser_member(f"Monster {i+1}", m.stats, False) for i, m in enumerate(sp.monster)]
+    # Bekannte gegnerische Attacken aus Sicht dieses Spielers
+    data["known"] = [_ser_attackebesitz(ab) for ab in sp.atk_known]
+    return data
+
+def lobby_snapshot(lobby_code: str):
     cleanup_lobbies()
     lobby = get_lobby(lobby_code)
 
-    # Screen selection by phase
-    if lobby.phase == 0:
-        scr = 1  # attack selection
-    elif lobby.phase == 1:
-        scr = 2  # pay life
-    elif lobby.phase == 2:
-        scr = 3  # combat
-    elif lobby.phase == 3:
-        scr = 4  # end
-    else:
-        scr = 1
+    # Screen by phase
+    if lobby.phase == 0: scr = 1
+    elif lobby.phase == 1: scr = 2
+    elif lobby.phase == 2: scr = 3
+    elif lobby.phase == 3: scr = 4
+    else: scr = 1
 
-    # Safe guards: starting/priority can be None before payment
     has_two = len(lobby.clients) == 2
-    has_start = lobby.starting is not None and has_two
-    has_prio = lobby.priority is not None and has_two
+    has_prio = (lobby.priority is not None) and has_two
 
     state = {
         "screen": scr,
@@ -220,31 +220,19 @@ def lobby_snapshot(lobby_code:str):
         "reaction": bool(lobby.reaktion),
         "priority_name": (lobby.clients[lobby.priority].spieler.name if has_prio else "-"),
         "stack": [],
-        "me": None,
-        "opp": None,
-        "opp_known": []
+        # NEU: fixe Reihenfolge, der Client mappt nach Namen
+        "players": []
     }
 
-    # Stack view (safe even early)
-    if has_two and lobby.starting is not None:
-        me_player = lobby.clients[lobby.starting].spieler
-    else:
-        me_player = lobby.clients[0].spieler if lobby.clients else None
-
+    # Stack
     for e in lobby.stack.attacken:
-        # color needs me_player to compare sides; fallback if missing
-        if me_player is not None:
-            color = "blue" if e.attacke.type == 2 else (
-                "green" if (not e.owner.is_monster and e.owner.spieler_id == me_player.spieler_id) else "red"
-            )
-        else:
-            color = "blue" if e.attacke.type == 2 else "green"
+        owner_name = lobby.clients[e.owner.spieler_id].spieler.name if len(lobby.clients) > e.owner.spieler_id else "?"
+        color = "blue" if e.attacke.type == 2 else "green"
         tgts = []
         if e.t_1 is not None: tgts.append("t1")
         if e.t_atk is not None: tgts.append("t_atk")
         if e.t_stk is not None: tgts.append(f"stack#{e.t_stk}")
         if e.t_2 is not None: tgts.append("t2")
-        owner_name = lobby.clients[e.owner.spieler_id].spieler.name if len(lobby.clients) > e.owner.spieler_id else "?"
         state["stack"].append({
             "name": e.attacke.name,
             "owner": owner_name,
@@ -252,27 +240,8 @@ def lobby_snapshot(lobby_code:str):
             "targets": tgts
         })
 
-    # Me / Opp only once starting is defined (after payment)
-        # Me / Opp nur, wenn starting definiert ist
-    if has_start:
-        me = lobby.clients[lobby.starting].spieler
-        opp = lobby.clients[(lobby.starting - 1) % 2].spieler
-        state["me"] = _ser_member(me.name, me.stats, True)
-        state["me"]["monsters"] = [_ser_member(f"Monster {i+1}", m.stats, False) for i, m in enumerate(me.monster)]
-        state["opp"] = _ser_member(opp.name, opp.stats, True)
-        state["opp"]["monsters"] = [_ser_member(f"Monster {i+1}", m.stats, False) for i, m in enumerate(opp.monster)]
-        # Bekannte gegnerische Attacken sind auf "me.atk_known" notiert
-        state["opp_known"] = [_ser_attackebesitz(ab) for ab in me.atk_known]
-    else:
-        # early phases: still show both players minimally if present
-        if len(lobby.clients) >= 1:
-            p0 = lobby.clients[0].spieler
-            state["me"] = _ser_member(p0.name, p0.stats, True)
-            state["me"]["monsters"] = [_ser_member(f"Monster {i+1}", m.stats, False) for i, m in enumerate(p0.monster)]
-        if len(lobby.clients) >= 2:
-            p1 = lobby.clients[1].spieler
-            state["opp"] = _ser_member(p1.name, p1.stats, True)
-            state["opp"]["monsters"] = [_ser_member(f"Monster {i+1}", m.stats, False) for i, m in enumerate(p1.monster)]
-        # opp_known unknown before starting side; leave empty
+    # Players in Lobby-Reihenfolge (0,1)
+    for i in range(len(lobby.clients)):
+        state["players"].append(_ser_player(lobby.clients[i].spieler))
 
     return state
