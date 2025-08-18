@@ -401,6 +401,21 @@ function renderState(state) {
   }
 }
 
+async function rpcAskHost(op, data = {}) {
+  return new Promise(async (resolve) => {
+    const reqId = Math.random().toString(36).slice(2);
+    const handler = (msg) => {
+      if (msg.data.reqId === reqId) {
+        channel.unsubscribe("rpc-resp", handler);
+        resolve(msg.data.res);
+      }
+    };
+    channel.subscribe("rpc-resp", handler);
+    await channel.publish("rpc", { to: hostId, op, data, reqId });
+  });
+}
+
+
 function renderPool(attacks) {
   ui.pool.innerHTML = attacks.map(a=>`
     <div class="atk" data-name="${a.name}">
@@ -450,28 +465,47 @@ ui.joinBtn.addEventListener('click', async () => {
 // ==============================
 // Screen 1 – Attackenwahl
 // ==============================
-ui.confirmPicks.addEventListener('click', async ()=>{
+ui.confirmPicks.addEventListener('click', async () => {
   if (picked.size === 0) { log("Bitte Attacken wählen."); return; }
 
+  // 1) Umschalten auf Rangeleien NUR für den Spieler, der "Immer vorbereitet" gewählt hat
   if (!desireRangeleien && picked.has("Immer vorbereitet")) {
     desireRangeleien = true;
-    if (isHost) {
-      try {
+
+    try {
+      if (isHost) {
+        // Host holt Pool lokal – KEIN Broadcast, damit der andere Spieler nicht umschaltet
         const rl = await Host.call("get_pool", { lobby_code: lobbyCodeVal, phase: 1, rangeleien: true });
-        await broadcast("pool", { pool: rl, rangeleien: true });
-      } catch (e) {
-        console.error("get_pool(rangeleien) failed", e);
+        renderPool(rl);
+      } else {
+        // Client bittet Host per RPC nur für sich um den Rangeleien-Pool
+        const res = await rpcAskHost("get_pool_rangeleien", { lobby_code: lobbyCodeVal });
+        renderPool(res.pool || []);
       }
-    } else {
-      log("Host schaltet auf Rangeleien um…");
+      // Nach Umschalten: Auswahl zurücksetzen & Max=3
+      picked.clear();
+      ui.pickedList.innerHTML = "";
+      ui.pickedCount.textContent = "0";
+      pickedMax = 3;
+      ui.pickedMax.textContent = "3";
+      log("Wähle 3 Rangeleien.");
+    } catch (e) {
+      console.error("Rangeleien-Pool laden fehlgeschlagen", e);
     }
-    return;
+    return; // Diesem Klick folgt typischerweise ein zweiter Klick zum Bestätigen der Rangeleien-Wahl
   }
 
+  // 2) Normale Bestätigung (entweder normale Attacken oder Rangeleien)
   const list = [...picked];
+
   if (isHost) {
     try {
-      const ok = await Host.call("submit_attacks", { lobby_code: lobbyCodeVal, player_name: localName, picks: list, rangeleien: desireRangeleien });
+      const ok = await Host.call("submit_attacks", {
+        lobby_code: lobbyCodeVal,
+        player_name: localName,
+        picks: list,
+        rangeleien: desireRangeleien
+      });
       if (!ok) { log("Wahl abgelehnt."); return; }
       const snap = await Host.snapshot();
       await broadcast("state", snap);
@@ -481,10 +515,16 @@ ui.confirmPicks.addEventListener('click', async ()=>{
       if (e && e.message) console.error(e.message);
     }
   } else {
-    const reqId = Math.random().toString(36).slice(2);
-    await channel.publish("rpc", { to: hostId, op: "submit_attacks", data: { name: localName, picks: list, rangeleien: desireRangeleien }, reqId });
+    // Client schickt RPC an den Host, der wirklich Python aufruft (handleRpc patched)
+    const ok = await rpcAskHost("submit_attacks", {
+      name: localName,
+      picks: list,
+      rangeleien: desireRangeleien
+    });
+    if (!ok) { log("Wahl abgelehnt."); return; }
   }
 });
+
 
 // ==============================
 // Screen 2 – Leben zahlen
@@ -568,19 +608,81 @@ ui.playBtn.addEventListener('click', async ()=>{
 // RPC handler (non-host)
 // ==============================
 async function handleRpc(op, data) {
-  switch(op){
-    case "getchar": return await selectCharacterTarget();
-    case "getatk":   return await selectAttackTarget();
-    case "getstack": return await selectStackTarget();
-    case "submit_attacks":
-    case "set_flags":
-    case "submit_pay":
-    case "pass":
-    case "play":
+  // Zielauswahl (immer beim Empfänger ausführen)
+  if (op === "getchar") return await selectCharacterTarget();
+  if (op === "getatk")  return await selectAttackTarget();
+  if (op === "getstack")return await selectStackTarget();
+
+  // Host-seitige RPCs: nur der Host führt Python aus
+  if (!isHost) return null;
+
+  switch (op) {
+    case "get_pool_rangeleien": {
+      // Nur anfragendem Client schicken, nicht broadcasten
+      const pool = await Host.call("get_pool", {
+        lobby_code: lobbyCodeVal,
+        phase: 1,
+        rangeleien: true
+      });
+      return { pool };
+    }
+    case "submit_attacks": {
+      const ok = await Host.call("submit_attacks", {
+        lobby_code: lobbyCodeVal,
+        player_name: data.name,
+        picks: data.picks,
+        rangeleien: !!data.rangeleien
+      });
+      const snap = await Host.snapshot();
+      await broadcast("state", snap);
+      return ok;
+    }
+    case "set_flags": {
+      await Host.call("set_flags", {
+        lobby_code: lobbyCodeVal,
+        player_name: data.name,
+        start: !!data.start,
+        end: !!data.end,
+        react: !!data.react
+      });
+      const snap = await Host.snapshot();
+      await broadcast("state", snap);
       return true;
+    }
+    case "submit_pay": {
+      await Host.call("submit_pay", {
+        lobby_code: lobbyCodeVal,
+        player_name: data.name,
+        amount: parseInt(data.amount || 0, 10)
+      });
+      const snap = await Host.snapshot();
+      await broadcast("state", snap);
+      return true;
+    }
+    case "pass": {
+      await Host.call("ui_pass", {
+        lobby_code: lobbyCodeVal,
+        player_name: data.name
+      });
+      const snap = await Host.snapshot();
+      await broadcast("state", snap);
+      return true;
+    }
+    case "play": {
+      await Host.call("ui_play", {
+        lobby_code: lobbyCodeVal,
+        player_name: data.name,
+        char: data.char,
+        attack_index: data.attackIndex
+      });
+      const snap = await Host.snapshot();
+      await broadcast("state", snap);
+      return true;
+    }
   }
   return null;
 }
+
 
 // ==============================
 // Target selection placeholders
