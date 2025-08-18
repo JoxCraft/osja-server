@@ -173,52 +173,41 @@ def _resolve_attackebesitz(lobby: eng.Lobby, path: dict, attack_index: int):
     except Exception:
         return None
 
-async def ui_play(lobby_code:str, player_name:str, char:dict, attack_index:int):
+def _find_ab_by_id(stats: eng.Stats, ab_id: int) -> eng.AttackeBesitz | None:
+    for ab in stats.attacken:
+        if id(ab) == ab_id:
+            return ab
+    return None
+
+async def ui_play(lobby_code:str, player_name:str, char:dict, ab_id:int):
     lobby = get_lobby(lobby_code)
     c = _client_by_name(lobby, player_name)
-    if lobby.priority != c.spieler.spieler_id:
+    me_sp = c.spieler
+
+    if lobby.priority != me_sp.spieler_id:
         return False
 
-    owner = _resolve_char(lobby, char)
-    if owner.spieler_id != c.spieler.spieler_id:
-        return False
+    # "me"/"opp" relativ zu diesem Spieler:
+    side = char.get("side")
+    kind = char.get("kind")
+    idx = int(char.get("index", 0))
 
-    try:
-        ab = owner.stats.attacken[attack_index]
-    except Exception:
-        return False
-
-    # Targets aus Attacke ableiten
-    t1 = t_atk = None
-    t_stk = None
-    t2 = None
-    tg = ab.attacke.targets if hasattr(ab.attacke, "targets") else [0,0,0,0]
-    t_1_req, t_atk_req, t_stk_req, t_2_req = tg
-
-    # Falls Ziele benötigt sind: via JS auswählen lassen und hier in Python-Objekte mappen
-    if t_1_req:
-        sel = await lobby.clients[owner.spieler_id].client.getcharactertarget()
-        t1 = _resolve_char(lobby, dict(sel))
-    if t_atk_req:
-        sel = await lobby.clients[owner.spieler_id].client.getatktarget()
-        chdesc = dict(sel.get("charPath", {}))
-        ai = int(sel.get("attackIndex", 0))
-        t_atk = _resolve_attackebesitz(lobby, chdesc, ai)
-    if t_stk_req:
-        idx = await lobby.clients[owner.spieler_id].client.getstacktarget()
+    owner = me_sp if side == "me" else lobby.clients[(me_sp.spieler_id - 1) % 2].spieler
+    if kind != "player":
         try:
-            t_stk = int(idx)
+            owner = owner.monster[idx]
         except Exception:
-            t_stk = None
-    if t_2_req:
-        sel = await lobby.clients[owner.spieler_id].client.getcharactertarget()
-        t2 = _resolve_char(lobby, dict(sel))
+            return False
 
-    # Attacke wirklich einsetzen
-    await eng.attacke_einsetzen(lobby, owner, ab, t1, t_atk, t_stk, t2)
+    # echtes AttackeBesitz per ab_id finden
+    ab = _find_ab_by_id(owner.stats, int(ab_id))
+    if ab is None:
+        return False
 
-    # Danach Stack evtl. ausführen / State ändert sich in eng.passen() – hier nur True zurück
+    # WICHTIG: Engine soll Targets erfragen → attacke_gewählt!
+    await eng.attacke_gewählt(lobby, owner, ab)
     return True
+
 
 
 # ---------- Snapshot ----------
@@ -232,22 +221,18 @@ def _ser_keywords(ab: eng.AttackeBesitz):
             out.append(nm)
     return out
 
-def _ser_attackebesitz(ab: eng.AttackeBesitz):
+def _ser_attackebesitz_full(ab: eng.AttackeBesitz):
     return {
+        "ab_id": id(ab),                           # 1:1 stabile ID
         "name": ab.attacke.name,
         "text": ab.attacke.text,
-        "keywords": _ser_keywords(ab)
+        "keywords": _ser_keywords(ab),
+        "atype": int(getattr(ab.attacke, "type", 0)),
     }
 
-def _ser_attacks(stats: eng.Stats):
-    out, seen_ids = [], set()
-    for ab in stats.attacken:
-      # Dedupe per Objekt-ID (nicht per Name, da es echte Duplikate mit gleichem Namen gibt)
-      if id(ab) in seen_ids: 
-          continue
-      seen_ids.add(id(ab))
-      out.append(_ser_attackebesitz(ab))
-    return out
+def _ser_attacks_full(stats: eng.Stats):
+    # KEINE Dedupe – jede AttackeBesitz einzeln
+    return [_ser_attackebesitz_full(ab) for ab in stats.attacken]
 
 def _ser_member(name: str, st: eng.Stats, is_player: bool):
     return {
@@ -255,13 +240,13 @@ def _ser_member(name: str, st: eng.Stats, is_player: bool):
         "hp": st.leben,
         "max": st.maxLeben,
         "spott": bool(st.spott),
-        "attacks": _ser_attacks(st)  # <<< wichtig
+        "attacks": _ser_attacks_full(st),
     }
 
 def _ser_player(sp: eng.Spieler):
     data = _ser_member(sp.name, sp.stats, True)
     data["monsters"] = [_ser_member(f"Monster {i+1}", m.stats, False) for i, m in enumerate(sp.monster)]
-    data["known"] = [_ser_attackebesitz(ab) for ab in sp.atk_known]
+    data["known"] = [_ser_attackebesitz_full(ab) for ab in sp.atk_known]   # 1:1 known
     data["flags"] = { "start": bool(sp.stop_start), "end": bool(sp.stop_end), "react": bool(sp.stop_react) }
     return data
 
@@ -288,7 +273,6 @@ def lobby_snapshot(lobby_code: str):
         "players": []
     }
 
-    # Stack
     for e in lobby.stack.attacken:
         owner_name = lobby.clients[e.owner.spieler_id].spieler.name if len(lobby.clients) > e.owner.spieler_id else "?"
         color = "blue" if e.attacke.type == 2 else "green"
