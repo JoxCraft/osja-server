@@ -615,12 +615,15 @@ ui.charAttacks.addEventListener('click', (e)=>{
 ui.passBtn.addEventListener('click', async ()=>{
   if (isHost) {
     await Host.call("ui_pass", { lobby_code: lobbyCodeVal, player_name: localName });
-    await broadcast("state", await Host.snapshot());
+    const snap = await Host.snapshot();
+    renderState(snap);                           // <<< sofort lokales UI aktualisieren
+    await broadcast("state", { ...snap, force: true });
   } else {
     const reqId = Math.random().toString(36).slice(2);
     await channel.publish("rpc", { to: hostId, op: "pass", data: { name: localName }, reqId });
   }
 });
+
 
 ui.playBtn.addEventListener('click', async ()=>{
   if (!selectedChar || selectedChar.side !== "me") { log("Wähle zuerst deinen Charakter/Monster."); return; }
