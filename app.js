@@ -79,33 +79,32 @@ function phaseLabel(turntime, reaction) {
   return map[idx] + (reaction ? " (Reaktion)" : "");
 }
 
-// Universal safe Python call: serialize args as JSON
+// Universal safe Python call: args via JSON; unterstützt sync und async Python-Funktionen
 async function pyCallJSON(name, args = {}) {
   try {
-    // expose args as JSON to Python
     globalThis._pyArgsJSON = JSON.stringify(args);
-
     const s = await pyodide.runPythonAsync(`
 import json
 from js import _pyArgsJSON
 _args = json.loads(_pyArgsJSON)
-_resp = ${name}(**_args)
-json.dumps(_resp)
+_res = ${name}(**_args)
+try:
+    # Falls es eine Coroutine ist: awaiten
+    import inspect
+    if inspect.isawaitable(_res):
+        import asyncio
+        _res = await _res
+except Exception:
+    pass
+json.dumps(_res)
     `);
-
     return JSON.parse(s);
-
   } catch (err) {
     console.error("Python call failed:", name, err);
-    if (err && err.message) {
-      console.error("Python error message:", err.message);
-    }
+    if (err && err.message) console.error("Python error message:", err.message);
     throw err;
   }
 }
-
-
-
 
 // ==============================
 // Ably init + Lobby join
