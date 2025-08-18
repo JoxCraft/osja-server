@@ -507,7 +507,7 @@ ui.confirmPicks.addEventListener('click', async () => {
       });
       if (!ok) { log("Wahl abgelehnt."); return; }
       const snap = await Host.snapshot();
-      await broadcast("state", snap);
+      await broadcast("state", { ...snap, force: true });
       if (snap.screen === 2) showScreen(2);
     } catch (e) {
       console.error("submit_attacks failed", e);
@@ -545,13 +545,27 @@ ui.payConfirm.addEventListener('click', async ()=>{
   if (isNaN(amount) || amount < 0) return;
   if (isHost) {
     await Host.call("submit_pay", { lobby_code: lobbyCodeVal, player_name: localName, amount });
-    await broadcast("state", await Host.snapshot());
-    showScreen(3);
+    const snap = await Host.snapshot();
+    await broadcast("state", { ...snap, force: true }); // Host rendert mit
   } else {
     const reqId = Math.random().toString(36).slice(2);
     await channel.publish("rpc", { to: hostId, op: "submit_pay", data: { name: localName, amount }, reqId });
   }
 });
+
+[ui.cbStart3, ui.cbEnd3, ui.cbReact3].forEach((cb) => {
+  cb.addEventListener('change', async ()=>{
+    if (isHost) {
+      await Host.call("set_flags", { lobby_code: lobbyCodeVal, player_name: localName, start: ui.cbStart3.checked, end: ui.cbEnd3.checked, react: ui.cbReact3.checked });
+      const snap = await Host.snapshot();
+      await broadcast("state", { ...snap, force: true });
+    } else {
+      const reqId = Math.random().toString(36).slice(2);
+      await channel.publish("rpc", { to: hostId, op: "set_flags", data: { name: localName, start: ui.cbStart3.checked, end: ui.cbEnd3.checked, react: ui.cbReact3.checked }, reqId });
+    }
+  });
+});
+
 
 // ==============================
 // Screen 3 – Kampfsteuerung
@@ -644,7 +658,7 @@ async function handleRpc(op, data) {
         rangeleien: !!data.rangeleien
       });
       const snap = await Host.snapshot();
-      await broadcast("state", snap);
+      await broadcast("state", { ...snap, force: true });
       return ok;
     }
     case "set_flags": {
@@ -656,7 +670,7 @@ async function handleRpc(op, data) {
         react: !!data.react
       });
       const snap = await Host.snapshot();
-      await broadcast("state", snap);
+      await broadcast("state", { ...snap, force: true });
       return true;
     }
     case "submit_pay": {
@@ -666,7 +680,7 @@ async function handleRpc(op, data) {
         amount: parseInt(data.amount || 0, 10)
       });
       const snap = await Host.snapshot();
-      await broadcast("state", snap);
+      await broadcast("state", { ...snap, force: true });
       return true;
     }
     case "pass": {
@@ -675,7 +689,7 @@ async function handleRpc(op, data) {
         player_name: data.name
       });
       const snap = await Host.snapshot();
-      await broadcast("state", snap);
+      await broadcast("state", { ...snap, force: true });
       return true;
     }
     case "play": {
@@ -686,7 +700,7 @@ async function handleRpc(op, data) {
         attack_index: data.attackIndex
       });
       const snap = await Host.snapshot();
-      await broadcast("state", snap);
+      await broadcast("state", { ...snap, force: true });
       return true;
     }
   }
@@ -742,7 +756,7 @@ json.dumps({"attack_count": sum(1 for v in eng.__dict__.values() if isinstance(v
     }
 
     const snap = await Host.snapshot();
-    await broadcast("state", snap);
+    await broadcast("state", { ...snap, force: true });
 
   } catch (outer) {
     console.error("ensureHostReadyAndCreate failed:", outer);
