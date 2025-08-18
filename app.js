@@ -79,26 +79,31 @@ function phaseLabel(turntime, reaction) {
   return map[idx] + (reaction ? " (Reaktion)" : "");
 }
 
-// JSON-safe Python call via js._pyArgs (no globals mapping passed)
-// Drop-in replacement: serialize args in JS, parse in Python.
-// Works on all Pyodide versions—no ffi/to_py needed.
+// Universal safe Python call: serialize args as JSON
 async function pyCallJSON(name, args = {}) {
   try {
-    globalThis._pyArgsJSON = JSON.stringify(args);  // expose as JS global
+    // expose args as JSON to Python
+    globalThis._pyArgsJSON = JSON.stringify(args);
+
     const s = await pyodide.runPythonAsync(`
 import json
 from js import _pyArgsJSON
-_args = json.loads(_pyArgsJSON)     # pure Python dict
+_args = json.loads(_pyArgsJSON)
 _resp = ${name}(**_args)
 json.dumps(_resp)
     `);
+
     return JSON.parse(s);
+
   } catch (err) {
-    console.error(\`Python call failed: \${name}\`, err);
-    if (err && err.message) console.error(err.message);
+    console.error("Python call failed:", name, err);
+    if (err && err.message) {
+      console.error("Python error message:", err.message);
+    }
     throw err;
   }
 }
+
 
 
 
