@@ -124,12 +124,13 @@ def set_flags(lobby_code:str, player_name:str, start:bool, end:bool, react:bool)
     c.spieler.stop_react = bool(react)
     return True
 
-def submit_pay(lobby_code:str, player_name:str, amount:int):
+async def submit_pay(lobby_code:str, player_name:str, amount:int):
     lobby = get_lobby(lobby_code)
     c = _client_by_name(lobby, player_name)
     _paid[player_name] = max(0, int(amount))
-    if len(lobby.clients)==2 and all(name in _paid for name in (lobby.clients[0].spieler.name, lobby.clients[1].spieler.name)):
-        eng.leben_zahlen(
+    if len(lobby.clients) == 2 and all(name in _paid for name in (lobby.clients[0].spieler.name, lobby.clients[1].spieler.name)):
+        # Beide haben bezahlt → jetzt ASYNC die Engine-Funktion awaiten
+        await eng.leben_zahlen(
             lobby,
             lobby.clients[0], _paid[lobby.clients[0].spieler.name],
             lobby.clients[1], _paid[lobby.clients[1].spieler.name]
