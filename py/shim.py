@@ -21,10 +21,14 @@ def get_lobby(code:str) -> eng.Lobby:
     raise RuntimeError("Lobby not found")
 
 def create_lobby(code:str):
+    # Vorher aufräumen: unvollständige Lobbys mit phase>0 entfernen
+    eng.lobbies[:] = [l for l in eng.lobbies if not (l.phase > 0 and len(l.clients) < 2)]
     if not any(l.id == code for l in eng.lobbies):
         eng.lobbies.append(eng.Lobby(code, clients=[]))
 
 async def spieler_beitreten_py(code:str, name:str, client_obj:Any) -> bool:
+    # Cleanup: unvollständige Lobbys mit phase>0 löschen
+    eng.lobbies[:] = [l for l in eng.lobbies if not (l.phase > 0 and len(l.clients) < 2)]
     return await eng.spieler_beitreten(code, name, client_obj)
 
 # ---- Pools ----
@@ -49,7 +53,6 @@ def get_pool(lobby_code:str, phase:int, rangeleien:bool=False):
 
 # ---- Auswahl & Phasen ----
 
-# Zwischenablage: wer hat schon gewählt / bezahlt
 _selected = {}
 _paid = {}
 
@@ -63,32 +66,27 @@ def submit_attacks(lobby_code:str, player_name:str, picks:list[str], rangeleien:
     lobby = get_lobby(lobby_code)
     c = _client_by_name(lobby, player_name)
     if not rangeleien:
-        # normale Attacken
         c.spieler.stats.attacken.clear()
         for n in picks:
             if n not in ATTACK: return False
             c.spieler.stats.attacken.append(eng.AttackeBesitz(attacke=ATTACK[n]))
-        # Passives offenlegen wechselseitig
+        # Passives offenlegen
         for ab in c.spieler.stats.attacken:
             if eng.Passiv in ab.attacke.keywords:
-                # Gegner findet diese Attacke "known"
                 other = lobby.clients[ (c.spieler.spieler_id - 1) % 2 ]
-                other.spieler.atk_known.append(ab)
-        # Passives anwenden
+                if ab not in other.spieler.atk_known:
+                    other.spieler.atk_known.append(ab)
         eng.apply_passives(c.spieler)
     else:
-        # Rangeleien als Zusatzattacken hinzufügen (Immer vorbereitet)
         c.spieler.stats.attacken.extend([eng.AttackeBesitz(attacke=ATTACK[n]) for n in picks])
 
     _selected[player_name] = True
-    # wenn beide fertig -> eng.atk_entschieden(...)
     if len(lobby.clients)==2 and all(_selected.get(cl.spieler.name) for cl in lobby.clients):
         eng.atk_entschieden(
             lobby,
             lobby.clients[0], [ab.attacke for ab in lobby.clients[0].spieler.stats.attacken],
             lobby.clients[1], [ab.attacke for ab in lobby.clients[1].spieler.stats.attacken],
         )
-        # Reset für nächste Phase
         _selected.clear()
     return True
 
@@ -104,7 +102,6 @@ def submit_pay(lobby_code:str, player_name:str, amount:int):
     lobby = get_lobby(lobby_code)
     c = _client_by_name(lobby, player_name)
     _paid[player_name] = amount
-    # Wenn beide entschieden:
     if len(lobby.clients)==2 and all(name in _paid for name in (lobby.clients[0].spieler.name, lobby.clients[1].spieler.name)):
         eng.leben_zahlen(lobby, lobby.clients[0], _paid[lobby.clients[0].spieler.name], lobby.clients[1], _paid[lobby.clients[1].spieler.name])
         _paid.clear()
@@ -115,15 +112,14 @@ def submit_pay(lobby_code:str, player_name:str, amount:int):
 def ui_pass(lobby_code:str, player_name:str):
     lobby = get_lobby(lobby_code)
     c = _client_by_name(lobby, player_name)
-    # Nur wenn der Spieler Priority hat
     if lobby.priority == c.spieler.spieler_id:
         eng.passen(lobby)
         return True
     return False
 
 def _resolve_char(lobby:eng.Lobby, path:dict) -> eng.Spieler|eng.Monster:
-    side = path["side"]  # "me" oder "opp"
-    kind = path["kind"]  # "player" oder "monster"
+    side = path["side"]
+    kind = path["kind"]
     index = path["index"]
     me = lobby.clients[ lobby.starting ].spieler
     opp = lobby.clients[ (lobby.starting - 1) % 2 ].spieler
@@ -138,7 +134,6 @@ def ui_play(lobby_code:str, player_name:str, char:dict, attack_index:int):
     c = _client_by_name(lobby, player_name)
     if lobby.priority != c.spieler.spieler_id:
         return False
-    # Character muss zu diesem Spieler gehören
     target = _resolve_char(lobby, char)
     if target.spieler_id != c.spieler.spieler_id:
         return False
@@ -146,8 +141,6 @@ def ui_play(lobby_code:str, player_name:str, char:dict, attack_index:int):
         ab = target.stats.attacken[attack_index]
     except Exception:
         return False
-    # Targets werden im Engine-Flow (ask_targets) erfragt.
-    # Nur den Start triggern:
     asyncio.create_task(eng.attacke_gewählt(lobby, target, ab))
     return True
 
@@ -166,13 +159,12 @@ def _ser_member(name, s:eng.Stats, is_player=True):
         "hp": s.leben,
         "max": s.maxLeben,
         "spott": bool(s.spott),
-        "attacks": [_ser_attackebesitz(ab) for ab in s.attacken] if is_player else [_ser_attackebesitz(ab) for ab in s.attacken]
+        "attacks": [_ser_attackebesitz(ab) for ab in s.attacken]
     }
     return data
 
 def lobby_snapshot(lobby_code:str):
     lobby = get_lobby(lobby_code)
-    # Bildschirmstatus grob schätzen
     if lobby.phase == 0: scr = 1
     elif lobby.phase == 1: scr = 2
     elif lobby.phase == 2: scr = 3
@@ -194,18 +186,13 @@ def lobby_snapshot(lobby_code:str):
         "opp_known": []
     }
 
-    # Stack serialisieren
     for e in lobby.stack.attacken:
         color = "blue" if e.attacke.type==2 else ("green" if (not e.owner.is_monster and e.owner.spieler_id==me.spieler_id) else "red")
         tgts = []
-        if e.t_1 is not None:
-          tgts.append("t1")
-        if e.t_atk is not None:
-          tgts.append("t_atk")
-        if e.t_stk is not None:
-          tgts.append(f"stack#{e.t_stk}")
-        if e.t_2 is not None:
-          tgts.append("t2")
+        if e.t_1 is not None: tgts.append("t1")
+        if e.t_atk is not None: tgts.append("t_atk")
+        if e.t_stk is not None: tgts.append(f"stack#{e.t_stk}")
+        if e.t_2 is not None: tgts.append("t2")
         state["stack"].append({
             "name": e.attacke.name,
             "owner": lobby.clients[e.owner.spieler_id].spieler.name,
@@ -219,7 +206,6 @@ def lobby_snapshot(lobby_code:str):
     if opp:
         state["opp"] = _ser_member(opp.name, opp.stats, True)
         state["opp"]["monsters"] = [_ser_member(f"Monster {i+1}", m.stats, False) for i,m in enumerate(opp.monster)]
-        # bek. gegnerische Attacken
         state["opp_known"] = [_ser_attackebesitz(ab) for ab in lobby.clients[me.spieler_id].spieler.atk_known] if me else []
 
     return state
