@@ -1,5 +1,5 @@
 // app.js
-const ABLY_API_KEY = "ABLY-XXXX.YOUR-KEY-HERE"; // <-- anpassen
+const ABLY_API_KEY = "3wcmYg.8GQUGA:WaFbpDvdQSDdntaxL6mBMg72Om8OcOybipf-Sbs5eRc"; // <-- anpassen
 const PY_ENGINE_PATH = "/py/engine.py";
 const PY_SHIM_PATH   = "/py/shim.py";
 
