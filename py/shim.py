@@ -3,6 +3,71 @@ import asyncio
 from typing import Any
 import engine as eng
 
+# --- Resolver relativ zur Besitzer-Perspektive (owner_id) ---
+def _resolve_char_rel(lobby: eng.Lobby, owner_id: int, sel: dict):
+    side = sel.get("side")
+    kind = sel.get("kind")
+    idx = int(sel.get("index", 0))
+
+    if side == "me":
+        sp = lobby.clients[owner_id].spieler
+    else:
+        sp = lobby.clients[(owner_id - 1) % 2].spieler
+
+    if kind == "player":
+        return sp
+    try:
+        return sp.monster[idx]
+    except Exception:
+        return sp
+
+def _find_ab_by_id_in_stats(stats: eng.Stats, ab_id: int):
+    for ab in stats.attacken:
+        if id(ab) == ab_id:
+            return ab
+    return None
+
+# --- Python-Proxy, der JS-Auswahl in echte Engine-Objekte wandelt ---
+class PyClient:
+    def __init__(self, lobby: eng.Lobby, owner_id: int, js_client):
+        self.lobby = lobby
+        self.owner_id = owner_id
+        self.js = js_client
+
+    async def message(self, text: str):
+        return await self.js.message(text)
+
+    async def win(self):
+        return await self.js.win()
+
+    async def getcharactertarget(self):
+        sel = await self.js.getcharactertarget()      # {side,kind,index}
+        return _resolve_char_rel(self.lobby, self.owner_id, dict(sel))
+
+    async def getatktarget(self):
+        sel = await self.js.getatktarget()            # {charPath:{...}, ab_id:int}
+        ch = _resolve_char_rel(self.lobby, self.owner_id, dict(sel.get("charPath", {})))
+        ab = _find_ab_by_id_in_stats(ch.stats, int(sel.get("ab_id")))
+        return ch, ab
+
+    async def getstacktarget(self):
+        return await self.js.getstacktarget()
+
+# --- benutze PyClient beim Beitritt ---
+async def spieler_beitreten_py(lobby_code: str, spielername: str, js_client):
+    eng.create_lobby(lobby_code) if not any(l.id == lobby_code for l in eng.lobbies) else None
+    # Engine-Join, danach JS-Client durch PyClient ersetzen
+    ok = await eng.spieler_beitreten(lobby_code, spielername, js_client)
+    if not ok:
+        return False
+    lobby = get_lobby(lobby_code)
+    # finde den soeben eingetragenen Client und wrappe ihn
+    for i, c in enumerate(lobby.clients):
+        if c.spieler.name == spielername:
+            lobby.clients[i].client = PyClient(lobby, c.spieler.spieler_id, js_client)
+            break
+    return True
+
 # ---------- Cleanup: stale lobbies löschen ----------
 def cleanup_lobbies():
     # lösche Lobbys, die in fortgeschrittener Phase sind, aber nicht voll
