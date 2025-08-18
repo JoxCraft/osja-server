@@ -5,15 +5,15 @@ import engine as eng
 
 # ---------- Cleanup: stale lobbies löschen ----------
 def cleanup_lobbies():
-    # lösche Lobbys, die in einer fortgeschrittenen Phase sind, aber nicht voll
+    # lösche Lobbys, die in fortgeschrittener Phase sind, aber nicht voll
     eng.lobbies[:] = [l for l in eng.lobbies if not (l.phase > 0 and len(l.clients) < 2)]
 
-# ---------- Registry ----------
+# ---------- Registry (robust, no dict by name) ----------
 def _collect_attacks():
     attacks = []
     for _, obj in eng.__dict__.items():
         if isinstance(obj, eng.Attacke):
-            attacks.append(obj)  # keep duplicates, don't key by name
+            attacks.append(obj)  # keep duplicates, e.g. two "Gedankenkontrolle"
     return attacks
 
 ATTACKS = _collect_attacks()
@@ -23,7 +23,7 @@ def get_lobby(code:str) -> eng.Lobby:
     for l in eng.lobbies:
         if l.id == code:
             return l
-    raise RuntimeError("Lobby not found")
+    raise RuntimeError(f"Lobby not found: {code!r}. Existing: {[lb.id for lb in eng.lobbies]}")
 
 def create_lobby(code:str):
     cleanup_lobbies()
@@ -38,10 +38,24 @@ def _client_by_name(lobby:eng.Lobby, name:str) -> eng.Client:
     for c in lobby.clients:
         if c.spieler.name == name:
             return c
-    raise RuntimeError("player not found")
+    raise RuntimeError(f"player not found: {name!r}. In lobby: {[cl.spieler.name for cl in lobby.clients]}")
 
 # ---------- Pools ----------
+def _attack_type_counts():
+    # for diagnostics
+    counts = {0:0, 1:0, 2:0}
+    for a in ATTACKS:
+        t = getattr(a, "type", None)
+        if t in counts:
+            counts[t] += 1
+    return counts
+
 def get_pool(lobby_code:str, phase:int, rangeleien:bool=False):
+    """
+    Screen 1: Attackenliste (nur Grund-Keywords).
+    - Normale: type==0
+    - Rangeleien: type==1
+    """
     pool = []
     for a in ATTACKS:
         if (not rangeleien and a.type == 0) or (rangeleien and a.type == 1):
@@ -51,8 +65,16 @@ def get_pool(lobby_code:str, phase:int, rangeleien:bool=False):
                 "keywords": [k.name for k in a.keywords],
             })
     pool.sort(key=lambda x: x["name"].lower())
-    return pool
 
+    # DIAGNOSTIC: if empty, raise with counts so you see the real reason in console
+    if not pool:
+        counts = _attack_type_counts()
+        raise RuntimeError(
+            f"get_pool() returned empty. counts by type: {counts}. "
+            f"rangeleien={rangeleien}. Did engine.Attacke declarations load?"
+        )
+
+    return pool
 
 # ---------- Auswahl & Phasen ----------
 _selected = {}
@@ -63,29 +85,28 @@ def submit_attacks(lobby_code:str, player_name:str, picks:list[str], rangeleien:
     c = _client_by_name(lobby, player_name)
 
     if not rangeleien:
-        # normale Attacken (ersetzen)
         c.spieler.stats.attacken.clear()
         for n in picks:
-            a = ATTACK.get(n)
-            if not a: return False
-            c.spieler.stats.attacken.append(eng.AttackeBesitz(attacke=a))
+            # pick by first match name (may be multiple with same name; UI is name-based)
+            matches = [a for a in ATTACKS if a.name == n]
+            if not matches:
+                raise RuntimeError(f"submit_attacks: unknown attack name {n!r}")
+            c.spieler.stats.attacken.append(eng.AttackeBesitz(attacke=matches[0]))
         # Passive dem Gegner verraten
         for ab in c.spieler.stats.attacken:
             if eng.Passiv in ab.attacke.keywords:
                 other = lobby.clients[(c.spieler.spieler_id - 1) % 2]
                 if ab not in other.spieler.atk_known:
                     other.spieler.atk_known.append(ab)
-        # Passive anwenden
         eng.apply_passives(c.spieler)
     else:
-        # Rangeleien (3) ergänzen
         for n in picks:
-            a = ATTACK.get(n)
-            if not a: return False
-            c.spieler.stats.attacken.append(eng.AttackeBesitz(attacke=a))
+            matches = [a for a in ATTACKS if a.name == n]
+            if not matches:
+                raise RuntimeError(f"submit_attacks (rangeleien): unknown attack name {n!r}")
+            c.spieler.stats.attacken.append(eng.AttackeBesitz(attacke=matches[0]))
 
     _selected[player_name] = True
-    # wenn beide fertig -> eng.atk_entschieden(...)
     if len(lobby.clients)==2 and all(_selected.get(cl.spieler.name) for cl in lobby.clients):
         eng.atk_entschieden(
             lobby,
@@ -107,7 +128,6 @@ def submit_pay(lobby_code:str, player_name:str, amount:int):
     lobby = get_lobby(lobby_code)
     c = _client_by_name(lobby, player_name)
     _paid[player_name] = max(0, int(amount))
-    # Wenn beide entschieden:
     if len(lobby.clients)==2 and all(name in _paid for name in (lobby.clients[0].spieler.name, lobby.clients[1].spieler.name)):
         eng.leben_zahlen(
             lobby,
@@ -150,7 +170,6 @@ def ui_play(lobby_code:str, player_name:str, char:dict, attack_index:int):
         ab = target.stats.attacken[attack_index]
     except Exception:
         return False
-    # Targets werden über ask_targets im Engine-Flow erfragt.
     asyncio.create_task(eng.attacke_gewählt(lobby, target, ab))
     return True
 
@@ -195,7 +214,6 @@ def lobby_snapshot(lobby_code:str):
         "opp_known": []
     }
 
-    # Stack
     for e in lobby.stack.attacken:
         color = "blue" if e.attacke.type==2 else ("green" if (not e.owner.is_monster and e.owner.spieler_id==me.spieler_id) else "red")
         tgts = []
