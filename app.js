@@ -85,10 +85,9 @@ async function pyCallJSON(name, args = {}) {
     // expose args to Python through js module
     globalThis._pyArgs = args; // accessible as "from js import _pyArgs"
     const s = await pyodide.runPythonAsync(`
-import json
+import json, pyodide
 from js import _pyArgs
-from pyodide.ffi import to_py
-_args = to_py(_pyArgs)            # <-- convert JsProxy to real Python dict
+_args = pyodide.to_py(_pyArgs)    # <-- convert JsProxy to real Python dict
 _resp = ${name}(**_args)
 json.dumps(_resp)
     `);
