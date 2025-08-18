@@ -55,7 +55,7 @@ class PyClient:
 
 # --- benutze PyClient beim Beitritt ---
 async def spieler_beitreten_py(lobby_code: str, spielername: str, js_client):
-    eng.create_lobby(lobby_code) if not any(l.id == lobby_code for l in eng.lobbies) else None
+    create_lobby(lobby_code) if not any(l.id == lobby_code for l in eng.lobbies) else None
     # Engine-Join, danach JS-Client durch PyClient ersetzen
     ok = await eng.spieler_beitreten(lobby_code, spielername, js_client)
     if not ok:
