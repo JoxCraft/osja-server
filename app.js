@@ -250,7 +250,6 @@ json.dumps(lobby_snapshot(js.lobbyCode))
   },
     async call(name, args = {}) {
     return pyCallJSON(name, args);
-
   }
 };
 
