@@ -9,14 +9,14 @@ def cleanup_lobbies():
     eng.lobbies[:] = [l for l in eng.lobbies if not (l.phase > 0 and len(l.clients) < 2)]
 
 # ---------- Registry ----------
-def _attack_registry():
-    reg = {}
-    for name, obj in eng.__dict__.items():
+def _collect_attacks():
+    attacks = []
+    for _, obj in eng.__dict__.items():
         if isinstance(obj, eng.Attacke):
-            reg[obj.name] = obj
-    return reg
+            attacks.append(obj)  # keep duplicates, don't key by name
+    return attacks
 
-ATTACK = _attack_registry()
+ATTACKS = _collect_attacks()
 
 # ---------- Lobby Helpers ----------
 def get_lobby(code:str) -> eng.Lobby:
@@ -42,21 +42,17 @@ def _client_by_name(lobby:eng.Lobby, name:str) -> eng.Client:
 
 # ---------- Pools ----------
 def get_pool(lobby_code:str, phase:int, rangeleien:bool=False):
-    """
-    Screen 1: Attackenliste (nur Grund-Keywords).
-    - Normale: type==0
-    - Rangeleien: type==1
-    """
     pool = []
-    for a in ATTACK.values():
-        if (not rangeleien and a.type==0) or (rangeleien and a.type==1):
+    for a in ATTACKS:
+        if (not rangeleien and a.type == 0) or (rangeleien and a.type == 1):
             pool.append({
                 "name": a.name,
                 "text": a.text,
-                "keywords": [k.name for k in a.keywords]
+                "keywords": [k.name for k in a.keywords],
             })
     pool.sort(key=lambda x: x["name"].lower())
     return pool
+
 
 # ---------- Auswahl & Phasen ----------
 _selected = {}
