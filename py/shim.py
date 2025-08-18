@@ -95,10 +95,6 @@ def create_lobby(code:str):
     if not any(l.id == code for l in eng.lobbies):
         eng.lobbies.append(eng.Lobby(code, clients=[]))
 
-async def spieler_beitreten_py(code:str, name:str, client_obj:Any) -> bool:
-    cleanup_lobbies()
-    return await eng.spieler_beitreten(code, name, client_obj)
-
 def _client_by_name(lobby:eng.Lobby, name:str) -> eng.Client:
     for c in lobby.clients:
         if c.spieler.name == name:
@@ -149,36 +145,27 @@ def submit_attacks(lobby_code:str, player_name:str, picks:list[str], rangeleien:
     lobby = get_lobby(lobby_code)
     c = _client_by_name(lobby, player_name)
 
-    if not rangeleien:
-        c.spieler.stats.attacken.clear()
-        for n in picks:
-            # pick by first match name (may be multiple with same name; UI is name-based)
-            matches = [a for a in ATTACKS if a.name == n]
-            if not matches:
-                raise RuntimeError(f"submit_attacks: unknown attack name {n!r}")
-            c.spieler.stats.attacken.append(eng.AttackeBesitz(attacke=matches[0]))
-        # Passive dem Gegner verraten
-        for ab in c.spieler.stats.attacken:
-            if eng.Passiv in ab.attacke.keywords:
-                other = lobby.clients[(c.spieler.spieler_id - 1) % 2]
-                if ab not in other.spieler.atk_known:
-                    other.spieler.atk_known.append(ab)
-        eng.apply_passives(c.spieler)
-    else:
-        for n in picks:
-            matches = [a for a in ATTACKS if a.name == n]
-            if not matches:
-                raise RuntimeError(f"submit_attacks (rangeleien): unknown attack name {n!r}")
-            c.spieler.stats.attacken.append(eng.AttackeBesitz(attacke=matches[0]))
+    # Picks als Attacke-Objekte sammeln (nur Namen → Attacke)
+    chosen = []
+    for n in picks:
+        matches = [a for a in ATTACKS if a.name == n and ((not rangeleien and a.type==0) or (rangeleien and a.type==1))]
+        if not matches:
+            raise RuntimeError(f"submit_attacks: unknown or mismatched attack name {n!r}")
+        chosen.append(matches[0])
 
-    _selected[player_name] = True
-    if len(lobby.clients)==2 and all(_selected.get(cl.spieler.name) for cl in lobby.clients):
+    # Temporär merken, nicht direkt ins Spieler-Inventar schreiben!
+    if "_tmp_picks" not in lobby.__dict__:
+        lobby._tmp_picks = {}
+    lobby._tmp_picks[c.spieler.name] = chosen
+
+    # Wenn beide fertig: Engine entscheidet und befüllt EINMAL
+    if len(lobby.clients)==2 and all(cl.spieler.name in lobby._tmp_picks for cl in lobby.clients):
         eng.atk_entschieden(
             lobby,
-            lobby.clients[0], [ab.attacke for ab in lobby.clients[0].spieler.stats.attacken],
-            lobby.clients[1], [ab.attacke for ab in lobby.clients[1].spieler.stats.attacken],
+            lobby.clients[0], lobby._tmp_picks[lobby.clients[0].spieler.name],
+            lobby.clients[1], lobby._tmp_picks[lobby.clients[1].spieler.name],
         )
-        _selected.clear()
+        del lobby._tmp_picks  # aufräumen
     return True
 
 def set_flags(lobby_code:str, player_name:str, start:bool, end:bool, react:bool):
