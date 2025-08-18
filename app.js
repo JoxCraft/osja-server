@@ -1,8 +1,8 @@
 // app.js
 // ==============================
-// Configure these paths/keys
+// Konfiguration
 // ==============================
-const ABLY_API_KEY = "3wcmYg.8GQUGA:WaFbpDvdQSDdntaxL6mBMg72Om8OcOybipf-Sbs5eRc"; // <-- set your Ably key
+const ABLY_API_KEY = "3wcmYg.8GQUGA:WaFbpDvdQSDdntaxL6mBMg72Om8OcOybipf-Sbs5eRc";   // <— trage deinen Ably-Key ein
 const PY_ENGINE_PATH = "/py/engine.py";
 const PY_SHIM_PATH   = "/py/shim.py";
 
@@ -52,7 +52,7 @@ const ui = {
   winner: document.getElementById('winner-text')
 };
 
-// Helpful global error logs
+// Error Logging
 window.addEventListener("unhandledrejection", (e) => {
   console.error("Unhandled promise rejection:", e.reason || e);
   if (e && e.reason && e.reason.message) console.error(e.reason.message);
@@ -79,25 +79,27 @@ function phaseLabel(turntime, reaction) {
   const idx = ((turntime % 5) + 5) % 5;
   return map[idx] + (reaction ? " (Reaktion)" : "");
 }
+function broadcast(type, data) {
+  return channel.publish(type, data);
+}
 
-// Universal safe Python call: args via JSON; unterstützt sync und async Python-Funktionen
+// JSON-safe Python call – unterstützt sync & async Python-Funktionen
 async function pyCallJSON(name, args = {}) {
   try {
     globalThis._pyArgsJSON = JSON.stringify(args);
     const s = await pyodide.runPythonAsync(`
-import json
+import json, inspect, asyncio
 from js import _pyArgsJSON
 _args = json.loads(_pyArgsJSON)
-_res = ${name}(**_args)
-try:
-    # Falls es eine Coroutine ist: awaiten
-    import inspect
+
+async def __runner():
+    _res = ${name}(**_args)
     if inspect.isawaitable(_res):
-        import asyncio
         _res = await _res
-except Exception:
-    pass
-json.dumps(_res)
+    return _res
+
+__out = await __runner()
+json.dumps(__out)
     `);
     return JSON.parse(s);
   } catch (err) {
@@ -134,6 +136,7 @@ async function initAbly(lobbyCode, name) {
     isHost = (hostId === clientId);
   });
 
+  // Pool-Rendering (vom Host oder spezifisch per RPC geliefert)
   channel.subscribe("pool", (msg) => {
     try {
       renderPool(msg.data.pool || []);
@@ -151,10 +154,12 @@ async function initAbly(lobbyCode, name) {
     }
   });
 
+  // State-Updates
   channel.subscribe("state", (msg) => {
     if (!isHost || msg.data.force) renderState(msg.data);
   });
 
+  // RPC Handling (für Nicht-Host Eingaben + Host führt Python aus)
   channel.subscribe("rpc", async (msg) => {
     const { to, op, data, reqId } = msg.data || {};
     if (to !== clientId) return;
@@ -167,7 +172,7 @@ async function initAbly(lobbyCode, name) {
     }
   });
 
-  // Let clients ask host to resend the pool
+  // Clients können Host bitten, den Pool neu zu senden
   channel.subscribe("pool-req", async () => {
     if (isHost && pyReady) {
       try {
@@ -181,7 +186,7 @@ async function initAbly(lobbyCode, name) {
 
   channel.subscribe("msg", (m) => log(m.data.text));
 
-  // Host creates lobby and sends pool when second joins
+  // Host: Lobby erstellen, sobald 2. Spieler da
   if (isHost) {
     presence.subscribe('enter', async () => {
       const m = await presence.get();
@@ -196,12 +201,9 @@ async function initAbly(lobbyCode, name) {
     }
   }
 }
-function broadcast(type, data) {
-  return channel.publish(type, data);
-}
 
 // ==============================
-// Pyodide load + engine import
+// Pyodide laden + Engine importieren
 // ==============================
 async function loadPyodideAndEngine() {
   try {
@@ -225,7 +227,7 @@ from shim import *
 }
 
 // ==============================
-// Host bridge to Python (NO globals arg)
+// Host bridge
 // ==============================
 const Host = {
   mkLocalClient() {
@@ -263,7 +265,6 @@ const Host = {
     const localClient = this.mkLocalClient();
     const remoteClient = this.mkRemoteClient(otherId);
     try {
-      // expose variables to Python via js module
       globalThis.localClient = localClient;
       globalThis.remoteClient = remoteClient;
       globalThis.lobbyCode = lobbyCode;
@@ -299,23 +300,23 @@ json.dumps(lobby_snapshot(_snapLobbyCode))
     }
   },
   async call(name, args = {}) {
-    return pyCallJSON(name, args); // JSON-safe bridge
+    return pyCallJSON(name, args);
   }
 };
 
 // ==============================
-// UI state + selection
+// UI State/Selection
 // ==============================
 let localName = "", lobbyCodeVal = "", opponentName = "Gegner";
 let picked = new Set();
 let pickedMax = 4;
 let desireRangeleien = false;
-let selectedChar = null;    // { side:'me'|'opp', kind:'player'|'monster', index:int }
-let selectedAttackIndex = null;
+let selectedChar = null;       // { side:'me'|'opp', kind:'player'|'monster', index:int }
+let selectedAttackId = null;   // ab_id (string/number)
 
 function resetSelections() {
   selectedChar = null;
-  selectedAttackIndex = null;
+  selectedAttackId = null;
   picked.clear();
   desireRangeleien = false;
   pickedMax = 4;
@@ -328,7 +329,6 @@ function renderState(state) {
   lastState = state;
   showScreen(state.screen);
 
-  // Kopfzeile
   if (state.screen >= 3 || state.screen === 2) {
     ui.turnNum.textContent = state.turn;
     ui.turnPhase.textContent = phaseLabel(state.turntime, state.reaction);
@@ -345,48 +345,20 @@ function renderState(state) {
     `).join("");
   }
 
-  // Spieler nach Namen mappen: ich links, der andere rechts
+  // Spieler nach Namen mappen
   let my = null, opp = null;
   if (Array.isArray(state.players)) {
     my = state.players.find(p => p.name === localName) || state.players[0] || null;
     opp = state.players.find(p => p.name !== (my && my.name)) || null;
   }
 
-  // Flags in beiden Screens spiegeln
-if (my && my.flags) {
-  if (ui.cbStart)  ui.cbStart.checked  = !!my.flags.start;
-  if (ui.cbEnd)    ui.cbEnd.checked    = !!my.flags.end;
-  if (ui.cbReact)  ui.cbReact.checked  = !!my.flags.react;
-
-  if (ui.cbStart3) ui.cbStart3.checked = !!my.flags.start;
-  if (ui.cbEnd3)   ui.cbEnd3.checked   = !!my.flags.end;
-  if (ui.cbReact3) ui.cbReact3.checked = !!my.flags.react;
-}
-
-
-    // Screen 2: bekannte Gegner-Attacken (aus Sicht "my")
-  if (state.screen === 2) {
-    const known = (my && Array.isArray(my.known)) ? my.known : [];
-    ui.oppKnown.innerHTML = known.map(a => `
-      <div class="atk">
-        <div><strong>${a.name}</strong></div>
-        <div class="small">${(a.keywords || []).join(", ")}</div>
-        <div class="small">${a.text}</div>
-      </div>
-    `).join("");
-  } else {
-    ui.oppKnown.innerHTML = "";
-  }
-
-
+  // Teams rendern
   function memberHtml(m, side, kind, index){
     const life = `${m.hp}/${m.max}`;
     return `<div class="member" data-side="${side}" data-kind="${kind}" data-index="${index}">
       <div><strong>${m.name}</strong> <span class="small">(${life})${m.spott ? " · Spott" : ""}</span></div>
     </div>`;
   }
-
-  // Teams rendern
   ui.friends.innerHTML = "";
   ui.enemies.innerHTML = "";
   if (my) {
@@ -401,30 +373,55 @@ if (my && my.flags) {
   // Rechte Spalte
   ui.charAttacks.innerHTML = "";
   ui.rightTitle.textContent = "Attacken";
-  if (selectedChar) {
-    if (selectedChar.side === "opp") {
-      // Bekannte gegnerische Attacken aus MEINER Sicht
-      ui.rightTitle.textContent = "Bekannte gegnerische Attacken";
-      const known = (my && my.known) ? my.known : [];
-      ui.charAttacks.innerHTML = known.map(a=>`
-        <div class="atk">
-          <div><strong>${a.name}</strong></div>
-          <div class="small">${(a.keywords || []).join(", ")}</div>
-          <div class="small">${a.text}</div>
-        </div>
-      `).join("");
-    } else if (selectedChar.side === "me" && my) {
-      const list = (selectedChar.kind === "player")
-        ? (my.attacks || [])
-        : ((my.monsters?.[selectedChar.index]?.attacks) || []);
-      ui.charAttacks.innerHTML = list.map((a,i)=>`
-        <div class="atk" data-attack-index="${i}">
-          <div><strong>${a.name}</strong></div>
-          <div class="small">${(a.keywords || []).join(", ")}</div>
-          <div class="small">${a.text}</div>
-        </div>
-      `).join("");
-    }
+  const fmtAtk = (a, i = null) => `
+    <div class="atk"${i !== null ? ` data-attack-index="${i}"` : ""} data-abid="${a.ab_id}">
+      <div><strong>${a.name}</strong> <span class="small">[${a.atype === 1 ? "Rangelei" : a.atype === 2 ? "Event" : "Normal"}]</span></div>
+      <div class="small">${(a.keywords || []).join(", ")}</div>
+      <div class="small">${a.text}</div>
+    </div>
+  `;
+
+  if (selectedChar && selectedChar.side === "opp") {
+    ui.rightTitle.textContent = "Bekannte gegnerische Attacken";
+    const known = (my && my.known) ? my.known : [];
+    ui.charAttacks.innerHTML = known.map(a => fmtAtk(a)).join("");
+  } else if (selectedChar && selectedChar.side === "me" && my) {
+    const list = (selectedChar.kind === "player")
+      ? (my.attacks || [])
+      : ((my.monsters?.[selectedChar.index]?.attacks) || []);
+    ui.charAttacks.innerHTML = list.map((a,i)=>fmtAtk(a,i)).join("");
+  }
+
+  // Screen 2: bekannte Gegner-Attacken
+  if (state.screen === 2) {
+    const known = (my && Array.isArray(my.known)) ? my.known : [];
+    ui.oppKnown.innerHTML = known.map(a => `
+      <div class="atk">
+        <div><strong>${a.name}</strong></div>
+        <div class="small">${(a.keywords || []).join(", ")}</div>
+        <div class="small">${a.text}</div>
+      </div>
+    `).join("");
+  } else {
+    ui.oppKnown.innerHTML = "";
+  }
+
+  // Flags (Screen 2 & 3) spiegeln
+  if (my && my.flags) {
+    if (ui.cbStart)  ui.cbStart.checked  = !!my.flags.start;
+    if (ui.cbEnd)    ui.cbEnd.checked    = !!my.flags.end;
+    if (ui.cbReact)  ui.cbReact.checked  = !!my.flags.react;
+
+    if (ui.cbStart3) ui.cbStart3.checked = !!my.flags.start;
+    if (ui.cbEnd3)   ui.cbEnd3.checked   = !!my.flags.end;
+    if (ui.cbReact3) ui.cbReact3.checked = !!my.flags.react;
+  }
+
+  // Buttons en/disablen
+  if (state.screen >= 3 && state.priority_name) {
+    const iHavePriority = (state.priority_name === localName);
+    ui.passBtn.disabled = !iHavePriority;
+    ui.playBtn.disabled = !iHavePriority;
   }
 
   // Screen 2: max zahlbar
@@ -434,26 +431,11 @@ if (my && my.flags) {
   }
 }
 
-async function rpcAskHost(op, data = {}) {
-  return new Promise(async (resolve) => {
-    const reqId = Math.random().toString(36).slice(2);
-    const handler = (msg) => {
-      if (msg.data.reqId === reqId) {
-        channel.unsubscribe("rpc-resp", handler);
-        resolve(msg.data.res);
-      }
-    };
-    channel.subscribe("rpc-resp", handler);
-    await channel.publish("rpc", { to: hostId, op, data, reqId });
-  });
-}
-
-
 function renderPool(attacks) {
   ui.pool.innerHTML = attacks.map(a=>`
     <div class="atk" data-name="${a.name}">
       <div><strong>${a.name}</strong></div>
-      <div class="small">${a.keywords.join(", ")}</div>
+      <div class="small">${(a.keywords || []).join(", ")}</div>
       <div class="small">${a.text}</div>
     </div>
   `).join("");
@@ -496,26 +478,40 @@ ui.joinBtn.addEventListener('click', async () => {
 });
 
 // ==============================
+// RPC helper (client -> host)
+// ==============================
+async function rpcAskHost(op, data = {}) {
+  return new Promise(async (resolve) => {
+    const reqId = Math.random().toString(36).slice(2);
+    const handler = (msg) => {
+      if (msg.data.reqId === reqId) {
+        channel.unsubscribe("rpc-resp", handler);
+        resolve(msg.data.res);
+      }
+    };
+    channel.subscribe("rpc-resp", handler);
+    await channel.publish("rpc", { to: hostId, op, data, reqId });
+  });
+}
+
+// ==============================
 // Screen 1 – Attackenwahl
 // ==============================
 ui.confirmPicks.addEventListener('click', async () => {
   if (picked.size === 0) { log("Bitte Attacken wählen."); return; }
 
-  // 1) Umschalten auf Rangeleien NUR für den Spieler, der "Immer vorbereitet" gewählt hat
+  // Umschalten auf Rangeleien nur für den, der "Immer vorbereitet" gewählt hat
   if (!desireRangeleien && picked.has("Immer vorbereitet")) {
     desireRangeleien = true;
 
     try {
       if (isHost) {
-        // Host holt Pool lokal – KEIN Broadcast, damit der andere Spieler nicht umschaltet
         const rl = await Host.call("get_pool", { lobby_code: lobbyCodeVal, phase: 1, rangeleien: true });
         renderPool(rl);
       } else {
-        // Client bittet Host per RPC nur für sich um den Rangeleien-Pool
         const res = await rpcAskHost("get_pool_rangeleien", { lobby_code: lobbyCodeVal });
         renderPool(res.pool || []);
       }
-      // Nach Umschalten: Auswahl zurücksetzen & Max=3
       picked.clear();
       ui.pickedList.innerHTML = "";
       ui.pickedCount.textContent = "0";
@@ -525,10 +521,10 @@ ui.confirmPicks.addEventListener('click', async () => {
     } catch (e) {
       console.error("Rangeleien-Pool laden fehlgeschlagen", e);
     }
-    return; // Diesem Klick folgt typischerweise ein zweiter Klick zum Bestätigen der Rangeleien-Wahl
+    return;
   }
 
-  // 2) Normale Bestätigung (entweder normale Attacken oder Rangeleien)
+  // Bestätigung
   const list = [...picked];
 
   if (isHost) {
@@ -541,14 +537,13 @@ ui.confirmPicks.addEventListener('click', async () => {
       });
       if (!ok) { log("Wahl abgelehnt."); return; }
       const snap = await Host.snapshot();
+      renderState(snap);
       await broadcast("state", { ...snap, force: true });
-      if (snap.screen === 2) showScreen(2);
     } catch (e) {
       console.error("submit_attacks failed", e);
       if (e && e.message) console.error(e.message);
     }
   } else {
-    // Client schickt RPC an den Host, der wirklich Python aufruft (handleRpc patched)
     const ok = await rpcAskHost("submit_attacks", {
       name: localName,
       picks: list,
@@ -558,18 +553,18 @@ ui.confirmPicks.addEventListener('click', async () => {
   }
 });
 
-
 // ==============================
-// Screen 2 – Leben zahlen
+// Screen 2 – Leben zahlen + Flags
 // ==============================
 [ui.cbStart, ui.cbEnd, ui.cbReact].forEach((cb) => {
   cb.addEventListener('change', async ()=>{
     if (isHost) {
       await Host.call("set_flags", { lobby_code: lobbyCodeVal, player_name: localName, start: ui.cbStart.checked, end: ui.cbEnd.checked, react: ui.cbReact.checked });
-      await broadcast("state", await Host.snapshot());
+      const snap = await Host.snapshot();
+      renderState(snap);
+      await broadcast("state", { ...snap, force: true });
     } else {
-      const reqId = Math.random().toString(36).slice(2);
-      await channel.publish("rpc", { to: hostId, op: "set_flags", data: { name: localName, start: ui.cbStart.checked, end: ui.cbEnd.checked, react: ui.cbReact.checked }, reqId });
+      await rpcAskHost("set_flags", { name: localName, start: ui.cbStart.checked, end: ui.cbEnd.checked, react: ui.cbReact.checked });
     }
   });
 });
@@ -580,26 +575,12 @@ ui.payConfirm.addEventListener('click', async ()=>{
   if (isHost) {
     await Host.call("submit_pay", { lobby_code: lobbyCodeVal, player_name: localName, amount });
     const snap = await Host.snapshot();
-    await broadcast("state", { ...snap, force: true }); // Host rendert mit
+    renderState(snap);
+    await broadcast("state", { ...snap, force: true });
   } else {
-    const reqId = Math.random().toString(36).slice(2);
-    await channel.publish("rpc", { to: hostId, op: "submit_pay", data: { name: localName, amount }, reqId });
+    await rpcAskHost("submit_pay", { name: localName, amount });
   }
 });
-
-[ui.cbStart3, ui.cbEnd3, ui.cbReact3].forEach((cb) => {
-  cb.addEventListener('change', async ()=>{
-    if (isHost) {
-      await Host.call("set_flags", { lobby_code: lobbyCodeVal, player_name: localName, start: ui.cbStart3.checked, end: ui.cbEnd3.checked, react: ui.cbReact3.checked });
-      const snap = await Host.snapshot();
-      await broadcast("state", { ...snap, force: true });
-    } else {
-      const reqId = Math.random().toString(36).slice(2);
-      await channel.publish("rpc", { to: hostId, op: "set_flags", data: { name: localName, start: ui.cbStart3.checked, end: ui.cbEnd3.checked, react: ui.cbReact3.checked }, reqId });
-    }
-  });
-});
-
 
 // ==============================
 // Screen 3 – Kampfsteuerung
@@ -607,19 +588,17 @@ ui.payConfirm.addEventListener('click', async ()=>{
 ui.friends.addEventListener('click', (e)=>{
   const target = e.target.closest('.member');
   if (!target) return;
-  // nur eine Gesamtauswahl: Freunde wählen => Gegner-Auswahl löschen
+  // nur eine Gesamtauswahl
   ui.enemies.querySelectorAll('.member').forEach(el=>el.classList.remove('selected'));
   ui.friends.querySelectorAll('.member').forEach(el=>el.classList.remove('selected'));
   target.classList.add('selected');
   selectedChar = { side: "me", kind: target.dataset.kind, index: parseInt(target.dataset.index,10) };
-  // Rechte Spalte neu aufbauen
   renderState(lastState);
 });
 
 ui.enemies.addEventListener('click', (e)=>{
   const target = e.target.closest('.member');
   if (!target) return;
-  // nur eine Gesamtauswahl: Gegner wählen => Freunde-Auswahl löschen
   ui.friends.querySelectorAll('.member').forEach(el=>el.classList.remove('selected'));
   ui.enemies.querySelectorAll('.member').forEach(el=>el.classList.remove('selected'));
   target.classList.add('selected');
@@ -627,59 +606,70 @@ ui.enemies.addEventListener('click', (e)=>{
   renderState(lastState);
 });
 
-
+// nur eigene Attacken anklickbar
 ui.charAttacks.addEventListener('click', (e)=>{
   const atk = e.target.closest('.atk');
   if (!atk) return;
-  // Nur eigene Attacken anwählbar
   if (!selectedChar || selectedChar.side !== "me") return;
   ui.charAttacks.querySelectorAll('.atk').forEach(el=>el.classList.remove('selected'));
   atk.classList.add('selected');
-  selectedAttackIndex = parseInt(atk.dataset.attackIndex ?? "-1", 10);
+  selectedAttackId = atk.getAttribute('data-abid');
 });
 
-
+// Pass
 ui.passBtn.addEventListener('click', async ()=>{
   if (isHost) {
     await Host.call("ui_pass", { lobby_code: lobbyCodeVal, player_name: localName });
     const snap = await Host.snapshot();
-    renderState(snap);                           // <<< sofort lokales UI aktualisieren
+    renderState(snap);
     await broadcast("state", { ...snap, force: true });
   } else {
-    const reqId = Math.random().toString(36).slice(2);
-    await channel.publish("rpc", { to: hostId, op: "pass", data: { name: localName }, reqId });
+    await rpcAskHost("pass", { name: localName });
   }
 });
 
-
+// Play – Engine bestimmt Targets via attacke_gewählt
 ui.playBtn.addEventListener('click', async ()=>{
   if (!selectedChar || selectedChar.side !== "me") { log("Wähle zuerst deinen Charakter/Monster."); return; }
-  if (selectedAttackIndex == null) { log("Wähle zuerst eine Attacke."); return; }
+  if (!selectedAttackId) { log("Wähle zuerst eine Attacke."); return; }
+
   if (isHost) {
-    const ok = await Host.call("ui_play", { lobby_code: lobbyCodeVal, player_name: localName, char: selectedChar, attack_index: selectedAttackIndex });
+    const ok = await Host.call("ui_play", { lobby_code: lobbyCodeVal, player_name: localName, char: selectedChar, ab_id: selectedAttackId });
     if (!ok) log("Attacke nicht einsetzbar.");
-    await broadcast("state", await Host.snapshot());
+    const snap = await Host.snapshot();
+    renderState(snap);
+    await broadcast("state", { ...snap, force: true });
   } else {
-    const reqId = Math.random().toString(36).slice(2);
-    await channel.publish("rpc", { to: hostId, op: "play", data: { name: localName, char: selectedChar, attackIndex: selectedAttackIndex }, reqId });
+    await rpcAskHost("play", { name: localName, char: selectedChar, ab_id: selectedAttackId });
   }
 });
 
+// Kampf-Checkboxen (Screen 3)
+[ui.cbStart3, ui.cbEnd3, ui.cbReact3].forEach((cb) => {
+  cb.addEventListener('change', async ()=>{
+    if (isHost) {
+      await Host.call("set_flags", { lobby_code: lobbyCodeVal, player_name: localName, start: ui.cbStart3.checked, end: ui.cbEnd3.checked, react: ui.cbReact3.checked });
+      const snap = await Host.snapshot();
+      renderState(snap);
+      await broadcast("state", { ...snap, force: true });
+    } else {
+      await rpcAskHost("set_flags", { name: localName, start: ui.cbStart3.checked, end: ui.cbEnd3.checked, react: ui.cbReact3.checked });
+    }
+  });
+});
+
 // ==============================
-// RPC handler (non-host)
+// RPC handler (nicht-Host Eingaben, Host führt Python aus)
 // ==============================
 async function handleRpc(op, data) {
-  // Zielauswahl (immer beim Empfänger ausführen)
   if (op === "getchar") return await selectCharacterTarget();
   if (op === "getatk")  return await selectAttackTarget();
   if (op === "getstack")return await selectStackTarget();
 
-  // Host-seitige RPCs: nur der Host führt Python aus
   if (!isHost) return null;
 
   switch (op) {
     case "get_pool_rangeleien": {
-      // Nur anfragendem Client schicken, nicht broadcasten
       const pool = await Host.call("get_pool", {
         lobby_code: lobbyCodeVal,
         phase: 1,
@@ -734,7 +724,7 @@ async function handleRpc(op, data) {
         lobby_code: lobbyCodeVal,
         player_name: data.name,
         char: data.char,
-        attack_index: data.attackIndex
+        ab_id: data.ab_id
       });
       const snap = await Host.snapshot();
       await broadcast("state", { ...snap, force: true });
@@ -744,16 +734,32 @@ async function handleRpc(op, data) {
   return null;
 }
 
+// ==============================
+// Target selection placeholders (Engine fragt via ask_targets → PyClient → JS)
+// ==============================
+async function selectCharacterTarget(){
+  // Default: eigener Spieler
+  return { side:"me", kind:"player", index:0 };
+}
+async function selectAttackTarget(){
+  // Nimmt aktuell selektierte eigene Attacke (im rechten Panel)
+  const atkEl = document.querySelector('#char-attacks .atk.selected');
+  if (!atkEl || !selectedChar || selectedChar.side !== "me") {
+    const first = document.querySelector('#char-attacks .atk');
+    if (!first) return { charPath: { side:"me", kind:"player", index:0 }, ab_id: 0 };
+    first.classList.add('selected');
+  }
+  const el = document.querySelector('#char-attacks .atk.selected');
+  const abId = Number(el.getAttribute('data-abid'));
+  return { charPath: selectedChar, ab_id: abId };
+}
+async function selectStackTarget(){
+  // Default: oberstes Stack-Element
+  return 0;
+}
 
 // ==============================
-// Target selection placeholders
-// ==============================
-async function selectCharacterTarget(){ return { side:"me", kind:"player", index:0 }; }
-async function selectAttackTarget(){ return { charPath: { side:"me", kind:"player", index:0 }, attackIndex: 0 }; }
-async function selectStackTarget(){ return 0; }
-
-// ==============================
-// Host ensure + send initial pool
+// Host ensure + initial pool
 // ==============================
 async function ensureHostReadyAndCreate(lobbyCode, meName, otherName, otherId) {
   try {
@@ -773,7 +779,7 @@ async function ensureHostReadyAndCreate(lobbyCode, meName, otherName, otherId) {
     }
     lobbyCreated = true;
 
-    // Diagnostic: how many Attacke were found?
+    // Diagnostic
     try {
       const info = await pyodide.runPythonAsync(`
 import json, engine as eng
@@ -793,6 +799,7 @@ json.dumps({"attack_count": sum(1 for v in eng.__dict__.values() if isinstance(v
     }
 
     const snap = await Host.snapshot();
+    renderState(snap);
     await broadcast("state", { ...snap, force: true });
 
   } catch (outer) {
