@@ -176,34 +176,53 @@ async def ui_play(lobby_code:str, player_name:str, char:dict, attack_index:int):
     return True
 
 # ---------- Snapshot ----------
-def _ser_attackebesitz(ab:eng.AttackeBesitz):
+def _ser_keywords(ab: eng.AttackeBesitz):
+    seen = set()
+    out = []
+    for k in list(ab.attacke.keywords) + list(ab.x_keywords):
+        nm = getattr(k, "name", str(k))
+        if nm not in seen:
+            seen.add(nm)
+            out.append(nm)
+    return out
+
+def _ser_attackebesitz(ab: eng.AttackeBesitz):
     return {
         "name": ab.attacke.name,
         "text": ab.attacke.text,
-        "keywords": [k.name for k in ab.attacke.keywords]
+        "keywords": _ser_keywords(ab)
     }
 
-def _ser_member(name, s:eng.Stats, is_player=True):
+def _ser_attacks(stats: eng.Stats):
+    out, seen_ids = [], set()
+    for ab in stats.attacken:
+      # Dedupe per Objekt-ID (nicht per Name, da es echte Duplikate mit gleichem Namen gibt)
+      if id(ab) in seen_ids: 
+          continue
+      seen_ids.add(id(ab))
+      out.append(_ser_attackebesitz(ab))
+    return out
+
+def _ser_member(name: str, st: eng.Stats, is_player: bool):
     return {
         "name": name,
-        "hp": s.leben,
-        "max": s.maxLeben,
-        "spott": bool(s.spott),
-        "attacks": [_ser_attackebesitz(ab) for ab in s.attacken]
+        "hp": st.leben,
+        "max": st.maxLeben,
+        "spott": bool(st.spott),
+        "attacks": _ser_attacks(st)  # <<< wichtig
     }
 
 def _ser_player(sp: eng.Spieler):
     data = _ser_member(sp.name, sp.stats, True)
     data["monsters"] = [_ser_member(f"Monster {i+1}", m.stats, False) for i, m in enumerate(sp.monster)]
-    # Bekannte gegnerische Attacken aus Sicht dieses Spielers
     data["known"] = [_ser_attackebesitz(ab) for ab in sp.atk_known]
+    data["flags"] = { "start": bool(sp.stop_start), "end": bool(sp.stop_end), "react": bool(sp.stop_react) }
     return data
 
 def lobby_snapshot(lobby_code: str):
     cleanup_lobbies()
     lobby = get_lobby(lobby_code)
 
-    # Screen by phase
     if lobby.phase == 0: scr = 1
     elif lobby.phase == 1: scr = 2
     elif lobby.phase == 2: scr = 3
@@ -220,7 +239,6 @@ def lobby_snapshot(lobby_code: str):
         "reaction": bool(lobby.reaktion),
         "priority_name": (lobby.clients[lobby.priority].spieler.name if has_prio else "-"),
         "stack": [],
-        # NEU: fixe Reihenfolge, der Client mappt nach Namen
         "players": []
     }
 
@@ -240,7 +258,6 @@ def lobby_snapshot(lobby_code: str):
             "targets": tgts
         })
 
-    # Players in Lobby-Reihenfolge (0,1)
     for i in range(len(lobby.clients)):
         state["players"].append(_ser_player(lobby.clients[i].spieler))
 
