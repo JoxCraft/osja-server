@@ -148,32 +148,78 @@ async def ui_pass(lobby_code: str, player_name: str):
     return False
 
 
-def _resolve_char(lobby:eng.Lobby, path:dict) -> eng.Spieler|eng.Monster:
-    side = path["side"]  # "me" oder "opp"
-    kind = path["kind"]  # "player" oder "monster"
-    index = path["index"]
-    me = lobby.clients[lobby.starting].spieler
-    opp = lobby.clients[(lobby.starting - 1) % 2].spieler
-    owner = me if side=="me" else opp
-    if kind == "player":
-        return owner
+def _resolve_char(lobby: eng.Lobby, desc: dict):
+    side = desc.get("side")
+    kind = desc.get("kind")
+    idx = int(desc.get("index", 0))
+    if side == "me":
+        sp = lobby.clients[0].spieler  # UI mappt später nach Namen; hier reicht Index
+    elif side == "opp":
+        sp = lobby.clients[1].spieler if len(lobby.clients) > 1 else lobby.clients[0].spieler
     else:
-        return owner.monster[index]
+        sp = lobby.clients[0].spieler
+    if kind == "player":
+        return sp
+    else:
+        try:
+            return sp.monster[idx]
+        except Exception:
+            return sp
+
+def _resolve_attackebesitz(lobby: eng.Lobby, path: dict, attack_index: int):
+    ch = _resolve_char(lobby, path)
+    try:
+        return ch.stats.attacken[attack_index]
+    except Exception:
+        return None
 
 async def ui_play(lobby_code:str, player_name:str, char:dict, attack_index:int):
     lobby = get_lobby(lobby_code)
     c = _client_by_name(lobby, player_name)
     if lobby.priority != c.spieler.spieler_id:
         return False
-    target = _resolve_char(lobby, char)
-    if target.spieler_id != c.spieler.spieler_id:
+
+    owner = _resolve_char(lobby, char)
+    if owner.spieler_id != c.spieler.spieler_id:
         return False
+
     try:
-        ab = target.stats.attacken[attack_index]
+        ab = owner.stats.attacken[attack_index]
     except Exception:
         return False
-    await eng.attacke_gewählt(lobby, target, ab)  # <<< await
+
+    # Targets aus Attacke ableiten
+    t1 = t_atk = None
+    t_stk = None
+    t2 = None
+    tg = ab.attacke.targets if hasattr(ab.attacke, "targets") else [0,0,0,0]
+    t_1_req, t_atk_req, t_stk_req, t_2_req = tg
+
+    # Falls Ziele benötigt sind: via JS auswählen lassen und hier in Python-Objekte mappen
+    if t_1_req:
+        sel = await lobby.clients[owner.spieler_id].client.getcharactertarget()
+        t1 = _resolve_char(lobby, dict(sel))
+    if t_atk_req:
+        sel = await lobby.clients[owner.spieler_id].client.getatktarget()
+        chdesc = dict(sel.get("charPath", {}))
+        ai = int(sel.get("attackIndex", 0))
+        t_atk = _resolve_attackebesitz(lobby, chdesc, ai)
+    if t_stk_req:
+        idx = await lobby.clients[owner.spieler_id].client.getstacktarget()
+        try:
+            t_stk = int(idx)
+        except Exception:
+            t_stk = None
+    if t_2_req:
+        sel = await lobby.clients[owner.spieler_id].client.getcharactertarget()
+        t2 = _resolve_char(lobby, dict(sel))
+
+    # Attacke wirklich einsetzen
+    await eng.attacke_einsetzen(lobby, owner, ab, t1, t_atk, t_stk, t2)
+
+    # Danach Stack evtl. ausführen / State ändert sich in eng.passen() – hier nur True zurück
     return True
+
 
 # ---------- Snapshot ----------
 def _ser_keywords(ab: eng.AttackeBesitz):
