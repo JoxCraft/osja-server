@@ -247,23 +247,31 @@ const Host = {
     });
   },
   async createLobby(lobbyCode, meName, otherName, otherId) {
-    const localClient = this.mkLocalClient();
-    const remoteClient = this.mkRemoteClient(otherId);
+  const localClient = this.mkLocalClient();
+  const remoteClient = this.mkRemoteClient(otherId);
+  try {
     await pyodide.runPythonAsync(`
+import sys
 lc = js.localClient
 rc = js.remoteClient
 lobbyCode = js.lobbyCode
 meName = js.meName
 otherName = js.otherName
 create_lobby(lobbyCode)
-assert await spieler_beitreten_py(lobbyCode, meName, lc)
-assert await spieler_beitreten_py(lobbyCode, otherName, rc)
+ok1 = await spieler_beitreten_py(lobbyCode, meName, lc)
+ok2 = await spieler_beitreten_py(lobbyCode, otherName, rc)
+assert ok1 and ok2, "spieler_beitreten_py returned False"
     `, {
       globals: {
         js: { localClient, remoteClient, lobbyCode, meName, otherName }
       }
     });
-  },
+  } catch (err) {
+    console.error("createLobby runPythonAsync error:", err);
+    if (err && err.message) console.error(err.message); // full Python traceback
+    throw err;
+  }
+},
   async snapshot() {
     const state = await pyodide.runPythonAsync(`
 import json
@@ -574,25 +582,58 @@ async function selectStackTarget(){ return 0; }
 // Host ensure + send initial pool
 // ==============================
 async function ensureHostReadyAndCreate(lobbyCode, meName, otherName, otherId) {
-  if (!pyReady) {
-    log("[Host] Lade Pyodide & Engine…");
-    await loadPyodideAndEngine();
-    log("[Host] Bereit.");
-  }
-  await Host.createLobby(lobbyCode, meName, otherName, otherId);
-  lobbyCreated = true;
-
-  // Send initial pool (normal attacks)
   try {
-    const pool = await Host.call("get_pool", { lobby_code: lobbyCode, phase: 1, rangeleien: false });
-    await broadcast("pool", { pool, rangeleien: false });
-  } catch (e) {
-    console.error("initial get_pool failed", e);
-  }
+    if (!pyReady) {
+      log("[Host] Lade Pyodide & Engine…");
+      await loadPyodideAndEngine();
+      log("[Host] Bereit.");
+    }
 
-  const snap = await Host.snapshot();
-  await broadcast("state", snap);
+    // Sanity: log otherId presence
+    if (!otherId) {
+      console.error("ensureHostReadyAndCreate: otherId is missing");
+    }
+
+    // IMPORTANT: catch Python errors here and print full traceback
+    try {
+      await Host.createLobby(lobbyCode, meName, otherName, otherId);
+    } catch (err) {
+      console.error("Host.createLobby Python error:", err);
+      if (err && err.message) console.error(err.message); // full Py traceback
+      throw err;
+    }
+    lobbyCreated = true;
+
+    // Quick diagnostic: how many Attacke objects were found by Python?
+    try {
+      const info = await pyodide.runPythonAsync(`
+import json, engine as eng
+json.dumps({"attack_count": sum(1 for v in eng.__dict__.values() if isinstance(v, eng.Attacke))})
+      `);
+      console.log("Python diagnostic:", JSON.parse(info)); // { attack_count: N }
+    } catch (e) {
+      console.error("Python diagnostic failed", e);
+    }
+
+    // Send initial pool (normal attacks)
+    try {
+      const pool = await Host.call("get_pool", { lobby_code: lobbyCode, phase: 1, rangeleien: false });
+      await broadcast("pool", { pool, rangeleien: false });
+    } catch (e) {
+      console.error("initial get_pool failed", e);
+      if (e && e.message) console.error(e.message);
+    }
+
+    const snap = await Host.snapshot();
+    await broadcast("state", snap);
+
+  } catch (outer) {
+    console.error("ensureHostReadyAndCreate failed:", outer);
+    if (outer && outer.message) console.error(outer.message);
+    throw outer;
+  }
 }
+
 
 // ==============================
 // Boot
