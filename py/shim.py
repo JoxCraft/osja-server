@@ -170,8 +170,6 @@ def submit_attacks(lobby_code: str, player_name: str, picks: list[str], rangelei
         entry["complete"] = not any(a.name == "Immer vorbereitet" for a in chosen)
     else:
         # Zweite Abgabe: Rangeleien nur erlaubt, wenn vorher "Immer vorbereitet" in base
-        if not entry["base"]:
-            raise RuntimeError("Zuerst normale Attacken wählen, dann Rangeleien.")
         if not any(a.name == "Immer vorbereitet" for a in entry["base"]):
             raise RuntimeError("Rangeleien können nur gewählt werden, wenn 'Immer vorbereitet' unter den normalen Attacken gewählt wurde.")
         entry["rgl"] = chosen
