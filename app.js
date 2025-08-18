@@ -2,7 +2,7 @@
 // ==============================
 // Configure these paths/keys
 // ==============================
-const ABLY_API_KEY = "ABLY-XXXX.YOUR-KEY-HERE"; // <-- set your Ably key
+const ABLY_API_KEY = "3wcmYg.8GQUGA:WaFbpDvdQSDdntaxL6mBMg72Om8OcOybipf-Sbs5eRc"; // <-- set your Ably key
 const PY_ENGINE_PATH = "/py/engine.py";         // your engine (server logic) file
 const PY_SHIM_PATH   = "/py/shim.py";           // shim that bridges engine <-> UI
 
