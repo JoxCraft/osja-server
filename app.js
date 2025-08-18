@@ -352,6 +352,18 @@ function renderState(state) {
     opp = state.players.find(p => p.name !== (my && my.name)) || null;
   }
 
+  // Flags in beiden Screens spiegeln
+if (my && my.flags) {
+  if (ui.cbStart)  ui.cbStart.checked  = !!my.flags.start;
+  if (ui.cbEnd)    ui.cbEnd.checked    = !!my.flags.end;
+  if (ui.cbReact)  ui.cbReact.checked  = !!my.flags.react;
+
+  if (ui.cbStart3) ui.cbStart3.checked = !!my.flags.start;
+  if (ui.cbEnd3)   ui.cbEnd3.checked   = !!my.flags.end;
+  if (ui.cbReact3) ui.cbReact3.checked = !!my.flags.react;
+}
+
+
     // Screen 2: bekannte Gegner-Attacken (aus Sicht "my")
   if (state.screen === 2) {
     const known = (my && Array.isArray(my.known)) ? my.known : [];
