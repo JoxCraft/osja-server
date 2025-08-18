@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>OsJa – 1vs1</title>
+  <style>
+    :root{
+      --bg:#0b0f14; --panel:#121a2a; --line:#1f2937; --muted:#9aa7b6;
+      --me:#38bdf8; --opp:#f472b6; --sys:#a3e635; --accent:#60a5fa;
+      --ok:#86efac; --warn:#facc15; --err:#fca5a5;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;background:var(--bg);color:#e6eef7;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+    a{color:var(--accent)}
+    .wrap{max-width:1200px;margin:0 auto;padding:16px}
+    .grid{display:grid;gap:12px}
+    .cols{grid-template-columns:280px 1fr 320px}
+    .row{grid-template-columns:1fr 1fr}
+    .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px}
+    .btn{background:#1e293b;border:1px solid var(--line);color:#e6eef7;padding:8px 12px;border-radius:10px;cursor:pointer}
+    .btn[disabled]{opacity:.5;cursor:not-allowed}
+    .list{display:grid;gap:8px;max-height:320px;overflow:auto}
+    .item{padding:8px;border:1px solid var(--line);border-radius:8px;cursor:pointer}
+    .item.sel{outline:2px solid var(--accent)}
+    .stack .item{border-left:4px solid var(--sys)}
+    .stack .item.enemy{border-left-color:var(--opp)}
+    .stack .item.friend{border-left-color:var(--me)}
+    .pill{display:inline-block;padding:2px 8px;border-radius:999px;background:#0f172a;border:1px solid var(--line);font-size:12px;color:var(--muted)}
+    .small{font-size:12px;color:var(--muted)}
+    .log{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;white-space:pre-wrap;max-height:180px;overflow:auto;background:#0a0f1a;border:1px solid var(--line);padding:8px;border-radius:8px}
+    .rowbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .hidden{display:none}
+    .center{display:flex;justify-content:center;align-items:center}
+    .overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:50}
+    .modal{width:min(640px,90vw)}
+    input,select{background:#0f172a;color:#e6eef7;border:1px solid var(--line);border-radius:8px;padding:8px}
+    label{font-size:14px;color:var(--muted)}
+  </style>
+  <!-- Pyodide -->
+  <script src="https://cdn.jsdelivr.net/pyodide/v0.28.1/full/pyodide.js"></script>
+  <!-- Ably -->
+  <script src="https://cdn.jsdelivr.net/npm/ably@1.2.47/build/ably.min.js"></script>
+</head>
+<body>
+<div class="wrap grid" style="gap:16px">
+  <h1>OsJa – 1vs1 (Cloudflare + Ably + Pyodide)</h1>
+
+  <!-- Screen 0: Join -->
+  <section id="screen0" class="card grid row">
+    <div class="grid" style="gap:8px">
+      <div class="rowbar">
+        <label>Lobby-ID<br><input id="inLobby" value="test123"/></label>
+        <label>Dein Name<br><input id="inName" value="Spieler"/></label>
+      </div>
+      <div class="rowbar">
+        <button class="btn" id="btnHost">Host</button>
+        <button class="btn" id="btnJoin">Join</button>
+      </div>
+      <div class="small">Hinweis: Setze deinen Ably Key in <code>app.js</code> (Variable <code>ABLY_KEY</code>).</div>
+    </div>
+    <div>
+      <div class="small">System-Log</div>
+      <div id="log0" class="log"></div>
+    </div>
+  </section>
+
+  <!-- Screen 1: Attacken wählen -->
+  <section id="screen1" class="card hidden">
+    <h2>Attacken wählen</h2>
+    <div class="small">Wähle bis zu <span id="maxAtk">4</span> Haupt-Attacken (Typ 0). Wenn <em>Verführerisches Angebot</em> gewählt ist: bis zu 6.<br>Wenn <em>Immer vorbereitet</em> gewählt ist: danach genau 3 Rangeleien (Typ 1) auswählen.</div>
+    <div class="grid row" style="margin-top:8px">
+      <div>
+        <h3 class="small">Haupt-Attacken (Typ 0)</h3>
+        <div id="listMain" class="list"></div>
+      </div>
+      <div>
+        <h3 class="small">Rangeleien (Typ 1) – optional / 3 bei „Immer vorbereitet“</h3>
+        <div id="listRgl" class="list"></div>
+      </div>
+    </div>
+    <div class="rowbar" style="margin-top:8px">
+      <button class="btn" id="btnConfirmAtk">Wahl bestätigen</button>
+      <span class="pill" id="pillChoice"></span>
+    </div>
+  </section>
+
+  <!-- Screen 2: Leben zahlen -->
+  <section id="screen2" class="card hidden">
+    <h2>Leben zahlen</h2>
+    <div class="rowbar">
+      <div id="lifeInfo" class="pill">—</div>
+      <label>Bezahlen (in 5er-Schritten) <input id="payInput" type="number" min="0" step="5" value="0"/></label>
+      <button class="btn" id="btnPay">Bezahlen bestätigen</button>
+    </div>
+  </section>
+
+  <!-- Screen 3: Kampf -->
+  <section id="screen3" class="card hidden">
+    <div class="rowbar">
+      <div id="turnInfo" class="pill">Zug —</div>
+      <div id="timeInfo" class="pill">Zeit —</div>
+      <div id="prioInfo" class="pill">Priority —</div>
+      <label><input type="checkbox" id="cbStart"/> Zuganfang</label>
+      <label><input type="checkbox" id="cbEnd"/> Zugende</label>
+      <label><input type="checkbox" id="cbReact"/> Reaktion</label>
+    </div>
+    <div class="grid cols" style="margin-top:12px">
+      <div>
+        <h3 class="small">Stack</h3>
+        <div id="stack" class="list stack"></div>
+      </div>
+      <div>
+        <h3 class="small">Charaktere</h3>
+        <div class="grid row" style="gap:12px">
+          <div class="card">
+            <div class="small">Eigene Seite</div>
+            <div id="myChars" class="list"></div>
+          </div>
+          <div class="card">
+            <div class="small">Gegner</div>
+            <div id="oppChars" class="list"></div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <h3 class="small">Attacken</h3>
+        <div id="atkList" class="list"></div>
+      </div>
+    </div>
+    <div class="rowbar" style="margin-top:12px">
+      <button class="btn" id="btnPass">Passen</button>
+      <button class="btn" id="btnUse">Attacke einsetzen</button>
+    </div>
+    <div style="margin-top:12px">
+      <div class="small">Meldungen</div>
+      <div id="log3" class="log"></div>
+    </div>
+  </section>
+
+  <!-- Screen 4: Ergebnis -->
+  <section id="screen4" class="card hidden center">
+    <div class="modal card center" style="text-align:center">
+      <h2 id="winner">Spielende</h2>
+      <button class="btn" onclick="location.reload()">Neu starten</button>
+    </div>
+  </section>
+
+  <!-- Overlay für Prompts (Targets etc.) -->
+  <div id="overlay" class="overlay hidden center">
+    <div class="modal card">
+      <h3 id="ovTitle">Auswahl</h3>
+      <div id="ovBody" class="list"></div>
+      <div class="rowbar" style="margin-top:8px;justify-content:flex-end">
+        <button class="btn" id="ovCancel">Abbrechen</button>
+      </div>
+    </div>
+  </div>
+</div>
+<script type="module" src="./app.js"></script>
+</body>
+</html>
