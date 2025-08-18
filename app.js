@@ -352,6 +352,21 @@ function renderState(state) {
     opp = state.players.find(p => p.name !== (my && my.name)) || null;
   }
 
+    // Screen 2: bekannte Gegner-Attacken (aus Sicht "my")
+  if (state.screen === 2) {
+    const known = (my && Array.isArray(my.known)) ? my.known : [];
+    ui.oppKnown.innerHTML = known.map(a => `
+      <div class="atk">
+        <div><strong>${a.name}</strong></div>
+        <div class="small">${(a.keywords || []).join(", ")}</div>
+        <div class="small">${a.text}</div>
+      </div>
+    `).join("");
+  } else {
+    ui.oppKnown.innerHTML = "";
+  }
+
+
   function memberHtml(m, side, kind, index){
     const life = `${m.hp}/${m.max}`;
     return `<div class="member" data-side="${side}" data-kind="${kind}" data-index="${index}">
