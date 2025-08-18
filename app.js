@@ -36,7 +36,16 @@ from js import pyPrompt, rpcPromptRemote, notify_local, notify_remote
 from pyodide.ffi import to_js
 
 # helper
+def _maintain():
+    # Lösche jede Lobby, die schon > Phase 0 ist, aber nicht (mehr) voll ist
+    try:
+        global lobbies
+        lobbies[:] = [lb for lb in lobbies if not (lb.phase > 0 and len(lb.clients) < 2)]
+    except Exception:
+        pass
+
 def GET_LOBBY(lid):
+    _maintain()
     for l in lobbies:
         if l.id == lid:
             return l
@@ -114,17 +123,24 @@ def map_atktarget(lobby, sel, client_obj):
 # public state (viewer: 0=host, 1=guest)
 
 def get_public_state(lid, viewer):
+    _maintain()
     lobby = GET_LOBBY(lid)
     if not lobby:
         return {"phase": -1}
     def dump_char(spieler, is_enemy):
+        def dump_ab(ab, show_text=True):
+            return {
+                "name": ab.attacke.name,
+                "text": ab.attacke.text if show_text else "",
+                "keywords": [k.name for k in (ab.attacke.keywords or [])] + [k.name for k in (ab.x_keywords or [])]
+            }
         own = {
             "name": spieler.name,
             "leben": spieler.stats.leben,
             "maxLeben": spieler.stats.maxLeben,
             "spott": spieler.stats.spott,
-            "atk": [{"name": ab.attacke.name, "text": ab.attacke.text} for ab in spieler.stats.attacken] if not is_enemy else [],
-            "atk_known": [{"name": ab.attacke.name, "text": ab.attacke.text} for ab in spieler.atk_known],
+            "atk": [dump_ab(ab, True) for ab in spieler.stats.attacken] if not is_enemy else [],
+            "atk_known": [dump_ab(ab, True) for ab in spieler.atk_known],
             "mon": []
         }
         for m in spieler.monster:
@@ -132,7 +148,7 @@ def get_public_state(lid, viewer):
                 "leben": m.stats.leben,
                 "maxLeben": m.stats.maxLeben,
                 "spott": m.stats.spott,
-                "atk": [{"name": ab.attacke.name, "text": ab.attacke.text} for ab in m.stats.attacken] if not is_enemy else [],
+                "atk": [dump_ab(ab, True) for ab in m.stats.attacken] if not is_enemy else [],
             })
         return own
     p0 = lobby.clients[0].spieler
@@ -160,7 +176,7 @@ def get_public_state(lid, viewer):
 ALL_ATTACKEN = [v for v in globals().values() if isinstance(v, Attacke)]
 
 def list_attacken_of_type(t):
-    return [{"name": a.name, "text": a.text} for a in ALL_ATTACKEN if a.type == t]
+    return [{"name": a.name, "text": a.text, "keywords": [k.name for k in (a.keywords or [])]} for a in ALL_ATTACKEN if a.type == t]
 
 # High-level wrappers
 async def py_host_join(lid, name_local):
@@ -207,8 +223,9 @@ async def py_set_pay(lid, who, pay):
     return True
 
 async def py_commit_pay_if_ready(lid):
+    _maintain()
     lobby = GET_LOBBY(lid)
-    if len(lobby.clients)<2: return False
+    if not lobby or len(lobby.clients)<2: return False
     c1, c2 = lobby.clients[0], lobby.clients[1]
     p1 = getattr(c1.spieler, "_pay", None)
     p2 = getattr(c2.spieler, "_pay", None)
@@ -273,6 +290,11 @@ window.notify_remote = (type, payload)=>{ channel.publish("notify", { type, ...p
 let promptResolver = null;
 window.pyPrompt = (kind, lid)=>{
   return new Promise((resolve)=>{
+    // Guard: ohne validen Spielzustand keine Prompts öffnen
+    if (!currentState || !currentState.players || currentState.players.length < 2){
+      resolve(null);
+      return;
+    }
     promptResolver = resolve;
     if (kind === "getstacktarget") renderPromptStack();
     if (kind === "getcharactertarget") renderPromptCharacter();
@@ -296,13 +318,20 @@ function resolveRpc(payload){
 }
 
 function handleRpcPrompt({ id, kind }){
-  // Gast zeigt Overlay und antwortet
+  // Gast zeigt Overlay und antwortet – wenn noch kein State vorhanden, antworte null
+  if (!currentState || !currentState.players || currentState.players.length < 2){
+    channel.publish("rpc:reply", { id, result: null });
+    return;
+  }
   new Promise((resolve)=>{
     promptResolver = resolve;
     if (kind === "getstacktarget") renderPromptStack();
     if (kind === "getcharactertarget") renderPromptCharacter();
     if (kind === "getatktarget") renderPromptAtkTarget();
   }).then((result)=>{
+    channel.publish("rpc:reply", { id, result });
+  });
+}).then((result)=>{
     channel.publish("rpc:reply", { id, result });
   });
 }
@@ -317,9 +346,54 @@ function renderPromptCharacter(){
   overlay.classList.remove("hidden");
   ovTitle.textContent = "Wähle Ziel-Charakter";
   ovBody.innerHTML = "";
+  if (!currentState || !currentState.players || currentState.players.length < 2){
+    const note = document.createElement("div");
+    note.className = "small";
+    note.textContent = "Noch kein zweiter Spieler verbunden – Auswahl nicht möglich.";
+    ovBody.appendChild(note);
+    return;
+  }
   const make = (who, kind, label, chars)=>{
     const h = document.createElement("div");
     h.innerHTML = `<div class="small">${label}</div>`;
+    ovBody.appendChild(h);
+    chars.forEach((c, idx)=>{
+      const el = document.createElement("div");
+      el.className = "item";
+      el.textContent = `${kind==='player'?'Spieler':'Monster'} – HP ${c.leben}/${c.maxLeben}`;
+      el.onclick = ()=>{
+        overlay.classList.add("hidden");
+        promptResolver({ who, kind, index: idx });
+      };
+      ovBody.appendChild(el);
+    });
+  };
+  make("self","player","Eigene Seite", [ currentState.players[0] ]);
+  currentState.players[0].mon.forEach((m, i)=>{});
+  currentState.players[0].mon.forEach((m, i)=>{
+    const el = document.createElement("div");
+    el.className = "item";
+    el.textContent = `Eigenes Monster ${i+1} – HP ${m.leben}/${m.maxLeben}`;
+    el.onclick = ()=>{ overlay.classList.add("hidden"); promptResolver({ who:"self", kind:"monster", index:i}); };
+    ovBody.appendChild(el);
+  });
+  const g = currentState.players[1];
+  if (!g){
+    const note = document.createElement("div"); note.className = "small"; note.textContent = "Kein Gegner verbunden."; ovBody.appendChild(note); return;
+  }
+  const elp = document.createElement("div");
+  elp.className = "item";
+  elp.textContent = `Gegner – HP ${g.leben}/${g.maxLeben}`;
+  elp.onclick = ()=>{ overlay.classList.add("hidden"); promptResolver({ who:"enemy", kind:"player", index:0}); };
+  ovBody.appendChild(elp);
+  g.mon.forEach((m, i)=>{
+    const el = document.createElement("div");
+    el.className = "item";
+    el.textContent = `Gegner Monster ${i+1} – HP ${m.leben}/${m.maxLeben}`;
+    el.onclick = ()=>{ overlay.classList.add("hidden"); promptResolver({ who:"enemy", kind:"monster", index:i}); };
+    ovBody.appendChild(el);
+  });
+}</div>`;
     ovBody.appendChild(h);
     chars.forEach((c, idx)=>{
       const el = document.createElement("div");
@@ -363,10 +437,48 @@ function renderPromptAtkTarget(){
   overlay.classList.remove("hidden");
   ovTitle.textContent = "Wähle Attacke eines Charakters";
   ovBody.innerHTML = "";
-  // Eigene Seite
+  if (!currentState || !currentState.players || currentState.players.length < 2){
+    const note = document.createElement("div"); note.className = "small"; note.textContent = "Noch kein Spielzustand verfügbar."; ovBody.appendChild(note); return;
+  }
+  const pill = (kw)=> kw && kw.length ? `<div class=small>${kw.map(k=>`<span class=\"pill\">${k}</span>`).join(' ')}</div>` : "";
   const add = (who, kind, label, char, idx)=>{
     const head = document.createElement("div");
     head.innerHTML = `<div class="small">${label}</div>`;
+    ovBody.appendChild(head);
+    (char.atk||[]).forEach((a, ai)=>{
+      const el = document.createElement("div");
+      el.className = "item";
+      el.innerHTML = `<div><strong>${a.name}</strong></div>${pill(a.keywords)}<div class="small">${a.text}</div>`;
+      el.onclick = ()=>{ overlay.classList.add("hidden"); promptResolver({ char:{ who, kind, index: idx }, attack_index: ai }); };
+      ovBody.appendChild(el);
+    });
+    if (!(char.atk||[]).length){ const t=document.createElement('div'); t.className='small'; t.textContent='Keine sichtbaren Attacken.'; ovBody.appendChild(t);}    
+  };
+  add("self","player","Eigener Spieler", currentState.players[0], 0);
+  currentState.players[0].mon.forEach((m,i)=> add("self","monster",`Eigenes Monster ${i+1}`, m, i));
+  const g = currentState.players[1]; if (!g){ const t=document.createElement('div'); t.className='small'; t.textContent='Kein Gegner verbunden.'; ovBody.appendChild(t); return; }
+  add("enemy","player","Gegner Spieler", g, 0);
+  g.mon.forEach((m,i)=> add("enemy","monster",`Gegner Monster ${i+1}`, m, i));
+}
+  const add = (who, kind, label, char, idx)=>{
+    const head = document.createElement("div");
+    head.innerHTML = `<div class="small">${label}</div>`;
+    ovBody.appendChild(head);
+    (char.atk||[]).forEach((a, ai)=>{
+      const el = document.createElement("div");
+      el.className = "item";
+      el.innerHTML = `<div><strong>${a.name}</strong></div><div class="small">${a.text}</div>`;
+      el.onclick = ()=>{ overlay.classList.add("hidden"); promptResolver({ char:{ who, kind, index: idx }, attack_index: ai }); };
+      ovBody.appendChild(el);
+    });
+    if (!(char.atk||[]).length){ const t=document.createElement('div'); t.className='small'; t.textContent='Keine sichtbaren Attacken.'; ovBody.appendChild(t);}    
+  };
+  add("self","player","Eigener Spieler", currentState.players[0], 0);
+  currentState.players[0].mon.forEach((m,i)=> add("self","monster",`Eigenes Monster ${i+1}`, m, i));
+  const g = currentState.players[1]; if (!g){ const t=document.createElement('div'); t.className='small'; t.textContent='Kein Gegner verbunden.'; ovBody.appendChild(t); return; }
+  add("enemy","player","Gegner Spieler", g, 0);
+  g.mon.forEach((m,i)=> add("enemy","monster",`Gegner Monster ${i+1}`, m, i));
+}</div>`;
     ovBody.appendChild(head);
     (char.atk||[]).forEach((a, ai)=>{
       const el = document.createElement("div");
@@ -386,10 +498,16 @@ function renderPromptStack(){
   overlay.classList.remove("hidden");
   ovTitle.textContent = "Wähle eine Attacke aus dem Stack";
   ovBody.innerHTML = "";
+  if (!currentState || !currentState.stack){ const t=document.createElement('div'); t.className='small'; t.textContent='Kein Stack verfügbar.'; ovBody.appendChild(t); return; }
+  if (!currentState.stack.length){ const t=document.createElement('div'); t.className='small'; t.textContent='Stack ist leer.'; ovBody.appendChild(t); return; }
   currentState.stack.forEach((s, i)=>{
     const el = document.createElement("div");
     el.className = "item";
     el.innerHTML = `<div><strong>[${i}] ${s.name}</strong> <span class="small">(${s.owner})</span></div>`;
+    el.onclick = ()=>{ overlay.classList.add("hidden"); promptResolver(i); };
+    ovBody.appendChild(el);
+  });
+}] ${s.name}</strong> <span class="small">(${s.owner})</span></div>`;
     el.onclick = ()=>{ overlay.classList.add("hidden"); promptResolver(i); };
     ovBody.appendChild(el);
   });
@@ -462,10 +580,15 @@ function renderAttackList(){
   const char = (selected.who==="self") ? (selected.kind==="player"? currentState.players[0] : currentState.players[0].mon[selected.monIndex])
                                        : (selected.kind==="player"? currentState.players[1] : currentState.players[1].mon[selected.monIndex]);
   const attacks = (selected.who==="self") ? (char.atk||[]) : (char.atk_known||[]);
+  const pill = (kw)=> kw && kw.length ? `<div class=small>${kw.map(k=>`<span class=\"pill\">${k}</span>`).join(' ')}</div>` : "";
   attacks.forEach((a,i)=>{
     const el = document.createElement("div");
     el.className = "item";
-    el.innerHTML = `<div><strong>${a.name}</strong></div><div class="small">${a.text}</div>`;
+    el.innerHTML = `<div><strong>${a.name}</strong></div>${pill(a.keywords)}<div class="small">${a.text}</div>`;
+    el.onclick = ()=>{ document.querySelectorAll('#atkList .item').forEach(n=>n.classList.remove('sel')); el.classList.add('sel'); selected.atkIndex=i; };
+    list.appendChild(el);
+  });
+}</strong></div><div class="small">${a.text}</div>`;
     el.onclick = ()=>{ document.querySelectorAll('#atkList .item').forEach(n=>n.classList.remove('sel')); el.classList.add('sel'); selected.atkIndex=i; };
     list.appendChild(el);
   });
@@ -486,7 +609,7 @@ async function host_onRemoteJoin(data){
 }
 function host_storeGuestChoices(data){ hostChoices.guest = { main:data.main||[], rgl:data.rgl||[] }; tryConfirmChoices(); }
 function host_storeGuestPay(data){ host_setPay("guest", data.pay||0); }
-async function host_onGuestMove(data){ await pyodide.runPythonAsync(`await py_use_attack('${lobbyId}','guest','${data.kind}','${data.monIndex||0}','${data.atkIndex}')`); await publishStateFromHost(); }
+async function host_onGuestMove(data){ await pyodide.runPythonAsync(`await py_use_attack('${lobbyId}','guest','${data.kind}','${data.monIndex||0}','${data.atkIndex}')`); await publishStateFromHost(); }{ await pyodide.runPythonAsync(`await py_use_attack('${lobbyId}','guest','${data.kind}','${data.monIndex||0}','${data.atkIndex}')`); await publishStateFromHost(); }
 async function host_onGuestPass(){ await pyodide.runPythonAsync(`await py_passen('${lobbyId}')`); await publishStateFromHost(); }
 
 async function tryConfirmChoices(){
@@ -519,8 +642,9 @@ $("btnHost").onclick = async ()=>{
   await loadEngine();
   // Host beitritt (lokaler Spieler A)
   const name = $("inName").value.trim()||"Host";
-  await pyodide.runPythonAsync(`await py_host_join('${lobbyId}', '${name.replace(/'/g,"\\'")}')`);
-  // Warte auf Gast → Screen 1, sobald join kommt
+  await pyodide.runPythonAsync(`await py_host_join('${lobbyId}', '${name.replace(/'/g,"\'")}')`);
+  // **Neu:** initialen Phase-0-State direkt publishen, damit Gäste/Prompts Kontext haben
+  await publishStateFromHost();
   log0("Bereit. Gast kann jetzt mit der gleichen Lobby-ID joinen.");
 };
 
@@ -549,11 +673,18 @@ async function loadAttackLists(){
 }
 function renderAtkLists(){
   listMain.innerHTML = ""; listRgl.innerHTML="";
+  const pill = (kw)=> kw && kw.length ? `<div class=small>${kw.map(k=>`<span class=\"pill\">${k}</span>`).join(' ')}</div>` : "";
   const add = (root, arr, selSet)=>{
     arr.forEach((a)=>{
       const el = document.createElement("div");
       el.className = "item";
-      el.innerHTML = `<div><strong>${a.name}</strong></div><div class=small>${a.text}</div>`;
+      el.innerHTML = `<div><strong>${a.name}</strong></div>${pill(a.keywords)}<div class=small>${a.text}</div>`;
+      el.onclick = ()=>{ if (selSet.has(a.name)) selSet.delete(a.name); else selSet.add(a.name); el.classList.toggle("sel"); updateChoicePill(); };
+      root.appendChild(el);
+    });
+  };
+  add(listMain, atkMain, selMain); add(listRgl, atkRgl, selRgl);
+}</strong></div><div class=small>${a.text}</div>`;
       el.onclick = ()=>{ if (selSet.has(a.name)) selSet.delete(a.name); else selSet.add(a.name); el.classList.toggle("sel"); updateChoicePill(); };
       root.appendChild(el);
     });
