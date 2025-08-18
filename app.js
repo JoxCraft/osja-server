@@ -12,6 +12,7 @@ const PY_SHIM_PATH   = "/py/shim.py";
 let realtime, channel, presence, clientId, hostId = null;
 let pyodide, pyReady = false, isHost = false, lobbyCreated = false;
 let screen = 0;
+let lastState = null;
 
 const ui = {
   screens: [...document.querySelectorAll('.screen')],
@@ -324,28 +325,17 @@ function resetSelections() {
 }
 
 function renderState(state) {
+  lastState = state;
   showScreen(state.screen);
 
-  if (state.screen >= 3) {
+  // Kopfzeile
+  if (state.screen >= 3 || state.screen === 2) {
     ui.turnNum.textContent = state.turn;
     ui.turnPhase.textContent = phaseLabel(state.turntime, state.reaction);
     ui.priorityName.textContent = state.priority_name || "-";
-
-    const iHavePriority = (state.priority_name === localName);
-    ui.passBtn.disabled = !iHavePriority;
-    ui.playBtn.disabled = !iHavePriority;
   }
 
-  if (state.opp_known) {
-    ui.oppKnown.innerHTML = state.opp_known.map(a => `
-      <div class="atk">
-        <div><strong>${a.name}</strong></div>
-        <div class="small">${a.keywords.join(", ")}</div>
-        <div class="small">${a.text}</div>
-      </div>
-    `).join("");
-  }
-
+  // Stack
   if (state.stack) {
     ui.stackView.innerHTML = state.stack.map(item => `
       <div class="item ${item.color}">
@@ -355,47 +345,64 @@ function renderState(state) {
     `).join("");
   }
 
+  // Spieler nach Namen mappen: ich links, der andere rechts
+  let my = null, opp = null;
+  if (Array.isArray(state.players)) {
+    my = state.players.find(p => p.name === localName) || state.players[0] || null;
+    opp = state.players.find(p => p.name !== (my && my.name)) || null;
+  }
+
   function memberHtml(m, side, kind, index){
     const life = `${m.hp}/${m.max}`;
     return `<div class="member" data-side="${side}" data-kind="${kind}" data-index="${index}">
       <div><strong>${m.name}</strong> <span class="small">(${life})${m.spott ? " · Spott" : ""}</span></div>
     </div>`;
   }
-  if (state.me && state.opp) {
-    const me = state.me, opp = state.opp;
-    ui.friends.innerHTML = memberHtml(me, "me", "player", 0)
-      + me.monsters.map((mm,i)=>memberHtml(mm,"me","monster",i)).join("");
+
+  // Teams rendern
+  ui.friends.innerHTML = "";
+  ui.enemies.innerHTML = "";
+  if (my) {
+    ui.friends.innerHTML = memberHtml(my, "me", "player", 0)
+      + (my.monsters || []).map((mm,i)=>memberHtml(mm,"me","monster",i)).join("");
+  }
+  if (opp) {
     ui.enemies.innerHTML = memberHtml(opp, "opp", "player", 0)
-      + opp.monsters.map((mm,i)=>memberHtml(mm,"opp","monster",i)).join("");
+      + (opp.monsters || []).map((mm,i)=>memberHtml(mm,"opp","monster",i)).join("");
   }
 
+  // Rechte Spalte
   ui.charAttacks.innerHTML = "";
   ui.rightTitle.textContent = "Attacken";
   if (selectedChar) {
-    const bundle = (selectedChar.side === "me") ? state.me : state.opp;
     if (selectedChar.side === "opp") {
+      // Bekannte gegnerische Attacken aus MEINER Sicht
       ui.rightTitle.textContent = "Bekannte gegnerische Attacken";
-      ui.charAttacks.innerHTML = (state.opp_known || []).map(a=>`
+      const known = (my && my.known) ? my.known : [];
+      ui.charAttacks.innerHTML = known.map(a=>`
         <div class="atk">
           <div><strong>${a.name}</strong></div>
-          <div class="small">${a.keywords.join(", ")}</div>
+          <div class="small">${(a.keywords || []).join(", ")}</div>
           <div class="small">${a.text}</div>
         </div>
       `).join("");
-    } else {
-      const list = (selectedChar.kind === "player") ? bundle.attacks : (bundle.monsters[selectedChar.index]?.attacks || []);
+    } else if (selectedChar.side === "me" && my) {
+      const list = (selectedChar.kind === "player")
+        ? (my.attacks || [])
+        : ((my.monsters?.[selectedChar.index]?.attacks) || []);
       ui.charAttacks.innerHTML = list.map((a,i)=>`
         <div class="atk" data-attack-index="${i}">
           <div><strong>${a.name}</strong></div>
-          <div class="small">${a.keywords.join(", ")}</div>
+          <div class="small">${(a.keywords || []).join(", ")}</div>
           <div class="small">${a.text}</div>
         </div>
       `).join("");
     }
   }
 
-  if (state.screen === 2 && state.me) {
-    const max = Math.max(0, (state.me.hp ?? 500) - 200);
+  // Screen 2: max zahlbar
+  if (state.screen === 2 && my) {
+    const max = Math.max(0, (my.hp ?? 500) - 200);
     ui.payInput.max = String(max);
   }
 }
