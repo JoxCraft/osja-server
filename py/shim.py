@@ -163,9 +163,7 @@ def submit_attacks(lobby_code:str, player_name:str, picks:list[str], rangeleien:
     else:
         # Zweite Runde (Rangeleien) -> zu bestehenden normalen Attacken hinzufügen
         base = lobby._tmp_picks.get(c.spieler.name, [])
-        # Optional: nur erlauben, wenn "Immer vorbereitet" wirklich dabei ist
         if not any(a.name == "Immer vorbereitet" for a in base):
-            # -> Entweder ignorieren, oder Fehler werfen. Ich werfe bewusst einen klaren Fehler:
             raise RuntimeError("Rangeleien können nur gewählt werden, wenn 'Immer vorbereitet' unter den normalen Attacken gewählt wurde.")
         lobby._tmp_picks[c.spieler.name] = base + chosen
 
@@ -250,7 +248,7 @@ async def ui_play(lobby_code:str, player_name:str, char:dict, ab_id:int):
     if lobby.priority != me_sp.spieler_id:
         return False
 
-    # "me"/"opp" relativ zu diesem Spieler:
+    # "me"/"opp" relativ zu diesem Spieler
     side = char.get("side")
     kind = char.get("kind")
     idx = int(char.get("index", 0))
