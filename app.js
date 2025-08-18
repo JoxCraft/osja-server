@@ -87,8 +87,10 @@ async function pyCallJSON(name, args = {}) {
     const s = await pyodide.runPythonAsync(`
 import json
 from js import _pyArgs
-resp = ${name}(**dict(_pyArgs))
-json.dumps(resp)
+from pyodide.ffi import to_py
+_args = to_py(_pyArgs)            # <-- convert JsProxy to real Python dict
+_resp = ${name}(**_args)
+json.dumps(_resp)
     `);
     return JSON.parse(s);
   } catch (err) {
@@ -97,6 +99,7 @@ json.dumps(resp)
     throw err;
   }
 }
+
 
 // ==============================
 // Ably init + Lobby join
