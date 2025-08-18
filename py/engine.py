@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field, replace
 import random
 import copy
+from __future__ import annotations
 
 
 @dataclass
