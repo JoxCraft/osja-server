@@ -3,8 +3,8 @@
 // Configure these paths/keys
 // ==============================
 const ABLY_API_KEY = "3wcmYg.8GQUGA:WaFbpDvdQSDdntaxL6mBMg72Om8OcOybipf-Sbs5eRc"; // <-- set your Ably key
-const PY_ENGINE_PATH = "/py/engine.py";         // your engine (server logic) file
-const PY_SHIM_PATH   = "/py/shim.py";           // shim that bridges engine <-> UI
+const PY_ENGINE_PATH = "/py/engine.py";
+const PY_SHIM_PATH   = "/py/shim.py";
 
 // ==============================
 // Globals
@@ -51,6 +51,15 @@ const ui = {
   winner: document.getElementById('winner-text')
 };
 
+// Helpful global error logs
+window.addEventListener("unhandledrejection", (e) => {
+  console.error("Unhandled promise rejection:", e.reason || e);
+  if (e && e.reason && e.reason.message) console.error(e.reason.message);
+});
+window.addEventListener("error", (e) => {
+  console.error("Window error:", e.error || e);
+});
+
 // ==============================
 // Helpers
 // ==============================
@@ -60,25 +69,27 @@ function log(msg) {
   ui.messages.appendChild(el);
   ui.messages.scrollTop = ui.messages.scrollHeight;
 }
-
 function showScreen(n) {
   screen = n;
   ui.screens.forEach((s, i) => s.classList.toggle('hidden', i !== n));
 }
-
 function phaseLabel(turntime, reaction) {
   const map = ["Anfang1", "Anfang2", "Mitte", "Ende2", "Ende1"];
   const idx = ((turntime % 5) + 5) % 5;
   return map[idx] + (reaction ? " (Reaktion)" : "");
 }
 
-// JSON-safe Python call (ensures we get plain JS objects, not PyProxy)
+// JSON-safe Python call via js._pyArgs (no globals mapping passed)
 async function pyCallJSON(name, args = {}) {
   try {
+    // expose args to Python through js module
+    globalThis._pyArgs = args; // accessible as "from js import _pyArgs"
     const s = await pyodide.runPythonAsync(`
 import json
-json.dumps(${name}(**js.args))
-    `, { globals: { js: { args } } });
+from js import _pyArgs
+resp = ${name}(**dict(_pyArgs))
+json.dumps(resp)
+    `);
     return JSON.parse(s);
   } catch (err) {
     console.error(`Python call failed: ${name}`, err);
@@ -98,7 +109,6 @@ async function initAbly(lobbyCode, name) {
   presence = channel.presence;
   await presence.enter({ name, isHost: false });
 
-  // Determine host (first presence becomes host)
   const members = await presence.get();
   if (members.length === 1) {
     isHost = true;
@@ -115,11 +125,9 @@ async function initAbly(lobbyCode, name) {
     isHost = (hostId === clientId);
   });
 
-  // Pool updates from host
   channel.subscribe("pool", (msg) => {
     try {
       renderPool(msg.data.pool || []);
-      // Reset selection when switching pool (e.g., to Rangeleien)
       resetSelections();
       if (msg.data.rangeleien) {
         pickedMax = 3;
@@ -134,12 +142,10 @@ async function initAbly(lobbyCode, name) {
     }
   });
 
-  // State updates
   channel.subscribe("state", (msg) => {
     if (!isHost || msg.data.force) renderState(msg.data);
   });
 
-  // RPC for target requests, etc.
   channel.subscribe("rpc", async (msg) => {
     const { to, op, data, reqId } = msg.data || {};
     if (to !== clientId) return;
@@ -152,7 +158,7 @@ async function initAbly(lobbyCode, name) {
     }
   });
 
-  // Let clients ask host to rebroadcast the pool
+  // Let clients ask host to resend the pool
   channel.subscribe("pool-req", async () => {
     if (isHost && pyReady) {
       try {
@@ -166,7 +172,7 @@ async function initAbly(lobbyCode, name) {
 
   channel.subscribe("msg", (m) => log(m.data.text));
 
-  // Host: when second joins, create lobby and send pool
+  // Host creates lobby and sends pool when second joins
   if (isHost) {
     presence.subscribe('enter', async () => {
       const m = await presence.get();
@@ -175,14 +181,12 @@ async function initAbly(lobbyCode, name) {
         await ensureHostReadyAndCreate(lobbyCode, name, other?.data?.name || "Gegner", other.clientId);
       }
     });
-    // If second is already present
     if (members.length >= 2 && !lobbyCreated) {
       const other = members.find(x => x.clientId !== clientId);
       await ensureHostReadyAndCreate(lobbyCode, name, other?.data?.name || "Gegner", other.clientId);
     }
   }
 }
-
 function broadcast(type, data) {
   return channel.publish(type, data);
 }
@@ -206,13 +210,13 @@ from shim import *
     pyReady = true;
   } catch (err) {
     console.error("Pyodide import error:", err);
-    if (err && err.message) console.error(err.message); // full Python traceback
+    if (err && err.message) console.error(err.message);
     throw err;
   }
 }
 
 // ==============================
-// Host bridge to Python
+// Host bridge to Python (NO globals arg)
 // ==============================
 const Host = {
   mkLocalClient() {
@@ -247,47 +251,53 @@ const Host = {
     });
   },
   async createLobby(lobbyCode, meName, otherName, otherId) {
-  const localClient = this.mkLocalClient();
-  const remoteClient = this.mkRemoteClient(otherId);
-  try {
-    await pyodide.runPythonAsync(`
-import sys
-lc = js.localClient
-rc = js.remoteClient
-lobbyCode = js.lobbyCode
-meName = js.meName
-otherName = js.otherName
+    const localClient = this.mkLocalClient();
+    const remoteClient = this.mkRemoteClient(otherId);
+    try {
+      // expose variables to Python via js module
+      globalThis.localClient = localClient;
+      globalThis.remoteClient = remoteClient;
+      globalThis.lobbyCode = lobbyCode;
+      globalThis.meName = meName;
+      globalThis.otherName = otherName;
+
+      await pyodide.runPythonAsync(`
+from js import localClient as lc, remoteClient as rc, lobbyCode, meName, otherName
 create_lobby(lobbyCode)
 ok1 = await spieler_beitreten_py(lobbyCode, meName, lc)
 ok2 = await spieler_beitreten_py(lobbyCode, otherName, rc)
 assert ok1 and ok2, "spieler_beitreten_py returned False"
-    `, {
-      globals: {
-        js: { localClient, remoteClient, lobbyCode, meName, otherName }
-      }
-    });
-  } catch (err) {
-    console.error("createLobby runPythonAsync error:", err);
-    if (err && err.message) console.error(err.message); // full Python traceback
-    throw err;
-  }
-},
+      `);
+    } catch (err) {
+      console.error("createLobby runPythonAsync error:", err);
+      if (err && err.message) console.error(err.message);
+      throw err;
+    }
+  },
   async snapshot() {
-    const state = await pyodide.runPythonAsync(`
+    try {
+      globalThis._snapLobbyCode = ui.lobby.value.trim();
+      const s = await pyodide.runPythonAsync(`
 import json
-json.dumps(lobby_snapshot(js.lobbyCode))
-    `, { globals: { js: { lobbyCode: ui.lobby.value.trim() } } });
-    return JSON.parse(state);
+from js import _snapLobbyCode
+json.dumps(lobby_snapshot(_snapLobbyCode))
+      `);
+      return JSON.parse(s);
+    } catch (err) {
+      console.error("snapshot error", err);
+      if (err && err.message) console.error(err.message);
+      throw err;
+    }
   },
   async call(name, args = {}) {
-    return pyCallJSON(name, args); // JSON-safe
+    return pyCallJSON(name, args); // JSON-safe bridge
   }
 };
 
 // ==============================
 // UI state + selection
 // ==============================
-let localName = "", lobbyCode = "", opponentName = "Gegner";
+let localName = "", lobbyCodeVal = "", opponentName = "Gegner";
 let picked = new Set();
 let pickedMax = 4;
 let desireRangeleien = false;
@@ -318,7 +328,6 @@ function renderState(state) {
     ui.playBtn.disabled = !iHavePriority;
   }
 
-  // Screen 2: opponent known attacks
   if (state.opp_known) {
     ui.oppKnown.innerHTML = state.opp_known.map(a => `
       <div class="atk">
@@ -329,7 +338,6 @@ function renderState(state) {
     `).join("");
   }
 
-  // Stack
   if (state.stack) {
     ui.stackView.innerHTML = state.stack.map(item => `
       <div class="item ${item.color}">
@@ -339,7 +347,6 @@ function renderState(state) {
     `).join("");
   }
 
-  // Teams
   function memberHtml(m, side, kind, index){
     const life = `${m.hp}/${m.max}`;
     return `<div class="member" data-side="${side}" data-kind="${kind}" data-index="${index}">
@@ -354,7 +361,6 @@ function renderState(state) {
       + opp.monsters.map((mm,i)=>memberHtml(mm,"opp","monster",i)).join("");
   }
 
-  // Right column
   ui.charAttacks.innerHTML = "";
   ui.rightTitle.textContent = "Attacken";
   if (selectedChar) {
@@ -380,7 +386,6 @@ function renderState(state) {
     }
   }
 
-  // Screen 2: set max pay amount
   if (state.screen === 2 && state.me) {
     const max = Math.max(0, (state.me.hp ?? 500) - 200);
     ui.payInput.max = String(max);
@@ -422,13 +427,12 @@ ui.joinBtn.addEventListener('click', async () => {
   const name = ui.name.value.trim();
   const lobby = ui.lobby.value.trim();
   if (!name || !lobby) { log("Bitte Name und Lobbycode ausfüllen."); return; }
-  localName = name; lobbyCode = lobby;
+  localName = name; lobbyCodeVal = lobby;
 
-  await initAbly(lobbyCode, localName);
+  await initAbly(lobbyCodeVal, localName);
   showScreen(1);
   broadcast("msg", { text: `${localName} ist beigetreten.` });
 
-  // If I'm not host, ask host to resend the pool (in case we missed the first one)
   if (!isHost) {
     await broadcast("pool-req", {});
   }
@@ -440,12 +444,11 @@ ui.joinBtn.addEventListener('click', async () => {
 ui.confirmPicks.addEventListener('click', async ()=>{
   if (picked.size === 0) { log("Bitte Attacken wählen."); return; }
 
-  // Switch to Rangeleien if "Immer vorbereitet" selected
   if (!desireRangeleien && picked.has("Immer vorbereitet")) {
     desireRangeleien = true;
     if (isHost) {
       try {
-        const rl = await Host.call("get_pool", { lobby_code: lobbyCode, phase: 1, rangeleien: true });
+        const rl = await Host.call("get_pool", { lobby_code: lobbyCodeVal, phase: 1, rangeleien: true });
         await broadcast("pool", { pool: rl, rangeleien: true });
       } catch (e) {
         console.error("get_pool(rangeleien) failed", e);
@@ -459,16 +462,16 @@ ui.confirmPicks.addEventListener('click', async ()=>{
   const list = [...picked];
   if (isHost) {
     try {
-      const ok = await Host.call("submit_attacks", { lobby_code: lobbyCode, player_name: localName, picks: list, rangeleien: desireRangeleien });
+      const ok = await Host.call("submit_attacks", { lobby_code: lobbyCodeVal, player_name: localName, picks: list, rangeleien: desireRangeleien });
       if (!ok) { log("Wahl abgelehnt."); return; }
       const snap = await Host.snapshot();
       await broadcast("state", snap);
       if (snap.screen === 2) showScreen(2);
     } catch (e) {
       console.error("submit_attacks failed", e);
+      if (e && e.message) console.error(e.message);
     }
   } else {
-    // Send to host via RPC
     const reqId = Math.random().toString(36).slice(2);
     await channel.publish("rpc", { to: hostId, op: "submit_attacks", data: { name: localName, picks: list, rangeleien: desireRangeleien }, reqId });
   }
@@ -480,7 +483,7 @@ ui.confirmPicks.addEventListener('click', async ()=>{
 [ui.cbStart, ui.cbEnd, ui.cbReact].forEach((cb) => {
   cb.addEventListener('change', async ()=>{
     if (isHost) {
-      await Host.call("set_flags", { lobby_code: lobbyCode, player_name: localName, start: ui.cbStart.checked, end: ui.cbEnd.checked, react: ui.cbReact.checked });
+      await Host.call("set_flags", { lobby_code: lobbyCodeVal, player_name: localName, start: ui.cbStart.checked, end: ui.cbEnd.checked, react: ui.cbReact.checked });
       await broadcast("state", await Host.snapshot());
     } else {
       const reqId = Math.random().toString(36).slice(2);
@@ -493,7 +496,7 @@ ui.payConfirm.addEventListener('click', async ()=>{
   const amount = parseInt(ui.payInput.value || "0", 10);
   if (isNaN(amount) || amount < 0) return;
   if (isHost) {
-    await Host.call("submit_pay", { lobby_code: lobbyCode, player_name: localName, amount });
+    await Host.call("submit_pay", { lobby_code: lobbyCodeVal, player_name: localName, amount });
     await broadcast("state", await Host.snapshot());
     showScreen(3);
   } else {
@@ -531,7 +534,7 @@ ui.charAttacks.addEventListener('click', (e)=>{
 
 ui.passBtn.addEventListener('click', async ()=>{
   if (isHost) {
-    await Host.call("ui_pass", { lobby_code: lobbyCode, player_name: localName });
+    await Host.call("ui_pass", { lobby_code: lobbyCodeVal, player_name: localName });
     await broadcast("state", await Host.snapshot());
   } else {
     const reqId = Math.random().toString(36).slice(2);
@@ -543,7 +546,7 @@ ui.playBtn.addEventListener('click', async ()=>{
   if (!selectedChar || selectedChar.side !== "me") { log("Wähle zuerst deinen Charakter/Monster."); return; }
   if (selectedAttackIndex == null) { log("Wähle zuerst eine Attacke."); return; }
   if (isHost) {
-    const ok = await Host.call("ui_play", { lobby_code: lobbyCode, player_name: localName, char: selectedChar, attack_index: selectedAttackIndex });
+    const ok = await Host.call("ui_play", { lobby_code: lobbyCodeVal, player_name: localName, char: selectedChar, attack_index: selectedAttackIndex });
     if (!ok) log("Attacke nicht einsetzbar.");
     await broadcast("state", await Host.snapshot());
   } else {
@@ -572,7 +575,6 @@ async function handleRpc(op, data) {
 
 // ==============================
 // Target selection placeholders
-// (replace with your real overlay flow)
 // ==============================
 async function selectCharacterTarget(){ return { side:"me", kind:"player", index:0 }; }
 async function selectAttackTarget(){ return { charPath: { side:"me", kind:"player", index:0 }, attackIndex: 0 }; }
@@ -588,34 +590,28 @@ async function ensureHostReadyAndCreate(lobbyCode, meName, otherName, otherId) {
       await loadPyodideAndEngine();
       log("[Host] Bereit.");
     }
+    if (!otherId) console.error("ensureHostReadyAndCreate: otherId is missing");
 
-    // Sanity: log otherId presence
-    if (!otherId) {
-      console.error("ensureHostReadyAndCreate: otherId is missing");
-    }
-
-    // IMPORTANT: catch Python errors here and print full traceback
     try {
       await Host.createLobby(lobbyCode, meName, otherName, otherId);
     } catch (err) {
       console.error("Host.createLobby Python error:", err);
-      if (err && err.message) console.error(err.message); // full Py traceback
+      if (err && err.message) console.error(err.message);
       throw err;
     }
     lobbyCreated = true;
 
-    // Quick diagnostic: how many Attacke objects were found by Python?
+    // Diagnostic: how many Attacke were found?
     try {
       const info = await pyodide.runPythonAsync(`
 import json, engine as eng
 json.dumps({"attack_count": sum(1 for v in eng.__dict__.values() if isinstance(v, eng.Attacke))})
       `);
-      console.log("Python diagnostic:", JSON.parse(info)); // { attack_count: N }
+      console.log("Python diagnostic:", JSON.parse(info));
     } catch (e) {
       console.error("Python diagnostic failed", e);
     }
 
-    // Send initial pool (normal attacks)
     try {
       const pool = await Host.call("get_pool", { lobby_code: lobbyCode, phase: 1, rangeleien: false });
       await broadcast("pool", { pool, rangeleien: false });
@@ -633,7 +629,6 @@ json.dumps({"attack_count": sum(1 for v in eng.__dict__.values() if isinstance(v
     throw outer;
   }
 }
-
 
 // ==============================
 // Boot
