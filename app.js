@@ -1,10 +1,10 @@
 // app.js
-const ABLY_API_KEY = "3wcmYg.8GQUGA:WaFbpDvdQSDdntaxL6mBMg72Om8OcOybipf-Sbs5eRc"; // <-- anpassen
-const PY_ENGINE_PATH = "/py/engine.py";         // Deine Python-Datei
-const PY_SHIM_PATH   = "/py/shim.py";           // Shim (unten geliefert)
+const ABLY_API_KEY = "ABLY-XXXX.YOUR-KEY-HERE"; // <-- anpassen
+const PY_ENGINE_PATH = "/py/engine.py";
+const PY_SHIM_PATH   = "/py/shim.py";
 
-let ably, realtime, channel, presence, clientId;
-let pyodide, pyReady = false, isHost = false;
+let realtime, channel, presence, clientId;
+let pyodide, pyReady = false, isHost = false, lobbyCreated = false;
 let screen = 0;
 
 const ui = {
@@ -69,7 +69,7 @@ function phaseLabel(turntime, reaction) {
 async function initAbly(lobbyCode, name) {
   clientId = name + "-" + Math.random().toString(36).slice(2, 7);
   realtime = new Ably.Realtime.Promise({ key: ABLY_API_KEY, clientId });
-  await new Promise((res, rej) => realtime.connection.once('connected', res));
+  await new Promise((res) => realtime.connection.once('connected', res));
   channel = realtime.channels.get("osja:" + lobbyCode);
   presence = channel.presence;
   await presence.enter({ name, isHost: false });
@@ -86,18 +86,47 @@ async function initAbly(lobbyCode, name) {
     isHost = (msg.data.hostId === clientId);
   });
 
-  // RPC / State / Control
+  // Pool-Updates empfangen
+  channel.subscribe("pool", (msg) => {
+    renderPool(msg.data.attacks);
+    showScreen(1);
+  });
+
+  // State-Updates (vom Host)
   channel.subscribe("state", (msg) => {
     if (!isHost) renderState(msg.data);
   });
+
+  // RPC für Remote-Targets
   channel.subscribe("rpc", async (msg) => {
     const { to, op, data, reqId } = msg.data;
     if (to !== clientId) return;
-    // Remote-Player muss antworten
     const res = await handleRpc(op, data);
     await channel.publish("rpc-resp", { reqId, res });
   });
+
+  // Messages
   channel.subscribe("msg", (m) => log(m.data.text));
+
+  // Wenn zweiter Spieler später beitritt: Host erzeugt Lobby & sendet Pool
+  presence.subscribe("enter", async (member) => {
+    if (!isHost) return;
+    if (!pyReady) return;
+    if (lobbyCreated) return;
+    const otherId = member.clientId;
+    if (otherId === clientId) return;
+    const otherName = member.data?.name || "Gegner";
+    await Host.createLobby(lobbyCode, localName, otherName, otherId);
+    lobbyCreated = true;
+
+    // Pool sofort senden
+    const pool = await Host.call("get_pool", { lobby_code: lobbyCode, phase: 1 });
+    await broadcast("pool", { attacks: pool });
+
+    // ersten Snapshot senden
+    const snap = await Host.snapshot();
+    await broadcast("state", snap);
+  });
 }
 
 function broadcast(type, data) {
@@ -126,13 +155,12 @@ from shim import *
 // Host: Python-Brücke
 // ------------------------
 const Host = {
-  // JS "Client" Objekte (für Python engine.Client.client)
   mkLocalClient() {
     return {
       message: async (text) => broadcast("msg", { text: `[Server] ${text}` }),
-      getcharactertarget: async () => selectCharacterTarget(),    // returns path {side, kind, index}
-      getatktarget: async () => selectAttackTarget(),              // returns {charPath, attackIndex}
-      getstacktarget: async () => selectStackTarget(),             // returns stack index
+      getcharactertarget: async () => selectCharacterTarget(),
+      getatktarget: async () => selectAttackTarget(),
+      getstacktarget: async () => selectStackTarget(),
       win: async () => { await broadcast("state", await Host.snapshot()); }
     };
   },
@@ -161,7 +189,6 @@ const Host = {
   async createLobby(lobbyCode, meName, otherName, otherId) {
     const localClient = this.mkLocalClient();
     const remoteClient = this.mkRemoteClient(otherId);
-    // python: create lobby + join 2 clients
     await pyodide.runPythonAsync(`
 lc = js.localClient
 rc = js.remoteClient
@@ -202,7 +229,7 @@ let localName = "", lobbyCode = "", opponentName = "Gegner", opponentId = null;
 let picked = new Set();
 let pickedMax = 4;
 let desireRangeleien = false;
-let selectedChar = null;  // {side:'me'|'opp', kind:'player'|'monster', index:int}
+let selectedChar = null;
 let selectedAttackIndex = null;
 
 function resetSelections() {
@@ -217,17 +244,14 @@ function resetSelections() {
 }
 
 function renderState(state) {
-  // Screen-Steuerung
   showScreen(state.screen);
 
-  // Turn/HUD
   if (state.screen >= 3) {
     ui.turnNum.textContent = state.turn;
     ui.turnPhase.textContent = phaseLabel(state.turntime, state.reaction);
     ui.priorityName.textContent = state.priority_name;
   }
 
-  // Gegnerische bekannte Attacken (Screen 2)
   if (state.opp_known) {
     ui.oppKnown.innerHTML = state.opp_known.map(a => `
       <div class="atk">
@@ -238,7 +262,6 @@ function renderState(state) {
     `).join("");
   }
 
-  // Stack
   if (state.stack) {
     ui.stackView.innerHTML = state.stack.map(item => `
       <div class="item ${item.color}">
@@ -248,7 +271,6 @@ function renderState(state) {
     `).join("");
   }
 
-  // Teams
   function memberHtml(m, side, kind, index){
     const life = `${m.hp}/${m.max}`;
     return `<div class="member" data-side="${side}" data-kind="${kind}" data-index="${index}">
@@ -263,13 +285,11 @@ function renderState(state) {
       + opp.monsters.map((mm,i)=>memberHtml(mm,"opp","monster",i)).join("");
   }
 
-  // Rechte Spalte (Attacken des selektierten Chars oder atk_known beim Gegner)
   ui.charAttacks.innerHTML = "";
   ui.rightTitle.textContent = "Attacken";
   if (selectedChar) {
     const bundle = (selectedChar.side === "me") ? state.me : state.opp;
     if (selectedChar.side === "opp") {
-      // beim Gegner: atk_known anzeigen
       ui.rightTitle.textContent = "Bekannte gegnerische Attacken";
       ui.charAttacks.innerHTML = (state.opp_known || []).map(a=>`
         <div class="atk">
@@ -279,7 +299,6 @@ function renderState(state) {
         </div>
       `).join("");
     } else {
-      // eigener Charakter/Monster -> seine Attacken
       const list = (selectedChar.kind === "player") ? bundle.attacks : (bundle.monsters[selectedChar.index]?.attacks || []);
       ui.charAttacks.innerHTML = list.map((a,i)=>`
         <div class="atk" data-attack-index="${i}">
@@ -304,9 +323,9 @@ ui.joinBtn.addEventListener('click', async () => {
   }
   await initAbly(lobbyCode, localName);
   showScreen(1);
-  broadcast("msg", { text: `${localName} ist beigetreten.` });
+  ui.pickedMax.textContent = "4";
+  log(`${localName} ist beigetreten.`);
 
-  // Finde Opponent
   const members = await presence.get();
   const other = members.find(m=>m.clientId!==realtime.clientId);
   if (other) {
@@ -318,19 +337,30 @@ ui.joinBtn.addEventListener('click', async () => {
     log("[Host] Lade Pyodide & Engine…");
     await loadPyodideAndEngine();
     log("[Host] Bereit.");
-    // Host erzeugt Lobby in Python, sobald 2 Spieler da sind
-    if (other) {
-      await Host.createLobby(lobbyCode, localName, opponentName, opponentId);
-      const snap = await Host.snapshot();
-      broadcast("state", snap);
+
+    // Host kann Lobby und Pool direkt bereitstellen (auch wenn Gegner später kommt)
+    if (!lobbyCreated) {
+      const otherName = opponentName || "Gegner";
+      const otherId = opponentId || ("pending-" + Math.random().toString(36).slice(2,7));
+      await Host.createLobby(lobbyCode, localName, otherName, otherId);
+      lobbyCreated = true;
     }
+
+    const pool = await Host.call("get_pool", { lobby_code: lobbyCode, phase: 1 });
+    await broadcast("pool", { attacks: pool });
+
+    const snap = await Host.snapshot();
+    await broadcast("state", snap);
   }
 });
 
 // ------------------------
 // Screen 1 – Attackenwahl
 // ------------------------
-let poolAttacks = [];  // vom Host aus Python geliefert
+let picked = new Set();
+let pickedMax = 4;
+let desireRangeleien = false;
+
 function renderPool(attacks) {
   ui.pool.innerHTML = attacks.map(a=>`
     <div class="atk" data-name="${a.name}">
@@ -346,10 +376,8 @@ function renderPool(attacks) {
         picked.delete(name);
         el.classList.remove('selected');
       } else {
-        // Max-Check (4 oder 6 wenn VA gewählt)
         const isVA = (name === "Verführerisches Angebot");
-        let cap = pickedMax;
-        if (picked.has("Verführerisches Angebot") || isVA) cap = 6;
+        let cap = (picked.has("Verführerisches Angebot") || isVA) ? 6 : pickedMax;
         if (picked.size >= cap && !isVA) return;
         picked.add(name);
         el.classList.add('selected');
@@ -363,14 +391,7 @@ function renderPool(attacks) {
 ui.confirmPicks.addEventListener('click', async ()=>{
   if (picked.size === 0) { log("Bitte Attacken wählen."); return; }
 
-  // Host orchestriert Auswahl-Liste
-  if (isHost) {
-    // Hole Pool normaler Attacken (type==0) vom Python
-    const data = await Host.call("get_pool", { lobby_code: lobbyCode, phase: 1 });
-    poolAttacks = data; // name, text, keywords
-  }
-
-  // Wenn "Immer vorbereitet" gewählt, Rangeleien-Auswahl
+  // Rangeleien-Phase aktivieren, falls "Immer vorbereitet" gewählt
   if (!desireRangeleien && picked.has("Immer vorbereitet")) {
     desireRangeleien = true;
     if (isHost) {
@@ -381,21 +402,20 @@ ui.confirmPicks.addEventListener('click', async ()=>{
       ui.pickedCount.textContent = "0";
       ui.pickedList.innerHTML = "";
       renderPool(rl);
-      broadcast("msg", { text: "Wähle 3 Rangeleien." });
+      await broadcast("pool", { attacks: rl }); // synchronisieren
+      await broadcast("msg", { text: "Wähle 3 Rangeleien." });
     } else {
-      // Nicht-Host wartet auf Host-Pool (kommt über state in real)
-      broadcast("msg", { text: "Host schaltet auf Rangeleien um…" });
+      await broadcast("msg", { text: "Host schaltet auf Rangeleien um…" });
     }
     return;
   }
 
-  // Abschicken der Wahl
   const list = [...picked];
   if (isHost) {
     const ok = await Host.call("submit_attacks", { lobby_code: lobbyCode, player_name: localName, picks: list, rangeleien: desireRangeleien });
     if (!ok) { log("Wahl abgelehnt."); return; }
     const snap = await Host.snapshot();
-    broadcast("state", snap);
+    await broadcast("state", snap);
     if (snap.screen === 2) showScreen(2);
   } else {
     await broadcast("rpc", { to: "HOST", op: "submit_attacks", data: { name: localName, picks: list, rangeleien: desireRangeleien }, reqId: "na" });
@@ -405,9 +425,8 @@ ui.confirmPicks.addEventListener('click', async ()=>{
 // ------------------------
 // Screen 2 – Leben zahlen
 // ------------------------
-[ui.cbStart, ui.cbEnd, ui.cbReact].forEach((cb, idx) => {
+[ui.cbStart, ui.cbEnd, ui.cbReact].forEach((cb) => {
   cb.addEventListener('change', ()=>{
-    broadcast("msg", { text: `${localName}: Checkbox geändert.` });
     if (isHost) {
       Host.call("set_flags", { lobby_code: lobbyCode, player_name: localName, start: ui.cbStart.checked, end: ui.cbEnd.checked, react: ui.cbReact.checked })
         .then(async ()=> broadcast("state", await Host.snapshot()));
@@ -422,23 +441,25 @@ ui.payConfirm.addEventListener('click', async ()=>{
   if (isNaN(amount) || amount < 0) return;
   if (isHost) {
     await Host.call("submit_pay", { lobby_code: lobbyCode, player_name: localName, amount });
-    broadcast("state", await Host.snapshot());
+    await broadcast("state", await Host.snapshot());
     showScreen(3);
   } else {
-    broadcast("rpc", { to: "HOST", op: "submit_pay", data: { name: localName, amount }, reqId: "na" });
+    await broadcast("rpc", { to: "HOST", op: "submit_pay", data: { name: localName, amount }, reqId: "na" });
   }
 });
 
 // ------------------------
 // Screen 3 – Kampfsteuerung
 // ------------------------
+let selectedChar = null;
+let selectedAttackIndex = null;
+
 ui.friends.addEventListener('click', (e)=>{
   const target = e.target.closest('.member');
   if (!target) return;
   ui.friends.querySelectorAll('.member').forEach(el=>el.classList.remove('selected'));
   target.classList.add('selected');
   selectedChar = { side: "me", kind: target.dataset.kind, index: parseInt(target.dataset.index,10) };
-  refreshRightCol();
 });
 ui.enemies.addEventListener('click', (e)=>{
   const target = e.target.closest('.member');
@@ -446,12 +467,7 @@ ui.enemies.addEventListener('click', (e)=>{
   ui.enemies.querySelectorAll('.member').forEach(el=>el.classList.remove('selected'));
   target.classList.add('selected');
   selectedChar = { side: "opp", kind: target.dataset.kind, index: parseInt(target.dataset.index,10) };
-  refreshRightCol();
 });
-function refreshRightCol(){
-  // Wird durch renderState mitgenutzt
-  broadcast("state", { ping: true }); // no-op, UI wird beim nächsten echten State-Update aktualisiert
-}
 
 ui.charAttacks.addEventListener('click', (e)=>{
   const atk = e.target.closest('.atk');
@@ -466,7 +482,7 @@ ui.passBtn.addEventListener('click', async ()=>{
     await broadcast("rpc", { to: "HOST", op: "pass", data: { name: localName }, reqId: "na" });
   } else {
     await Host.call("ui_pass", { lobby_code: lobbyCode, player_name: localName });
-    broadcast("state", await Host.snapshot());
+    await broadcast("state", await Host.snapshot());
   }
 });
 
@@ -478,7 +494,7 @@ ui.playBtn.addEventListener('click', async ()=>{
   } else {
     const ok = await Host.call("ui_play", { lobby_code: lobbyCode, player_name: localName, char: selectedChar, attack_index: selectedAttackIndex });
     if (!ok) log("Attacke nicht einsetzbar.");
-    broadcast("state", await Host.snapshot());
+    await broadcast("state", await Host.snapshot());
   }
 });
 
@@ -487,55 +503,25 @@ ui.playBtn.addEventListener('click', async ()=>{
 // ------------------------
 async function handleRpc(op, data) {
   switch(op){
-    case "getchar": {
-      // UI erlaubt Auswahl; hier minimal: wähle dich selbst
-      // In echter Nutzung würdest du wie in Host-Local die Auswahl über UI steuern.
-      return await selectCharacterTarget();
-    }
-    case "getatk": {
-      return await selectAttackTarget();
-    }
-    case "getstack": {
-      return await selectStackTarget();
-    }
-    case "submit_attacks": {
-      // Nicht-Host sendet Picks -> Host wertet aus (hier passt Host bereits oben)
+    case "getchar": return await selectCharacterTarget();
+    case "getatk":  return await selectAttackTarget();
+    case "getstack":return await selectStackTarget();
+    case "submit_attacks":
+    case "set_flags":
+    case "submit_pay":
+    case "pass":
+    case "play":
       return true;
-    }
-    case "set_flags": {
-      return true;
-    }
-    case "submit_pay": {
-      return true;
-    }
-    case "pass": {
-      return true;
-    }
-    case "play": {
-      return true;
-    }
   }
   return null;
 }
 
 // ------------------------
-// Auswahl-Dialoge (vereinfachte Platzhalter)
-// Du kannst diese Logik durch echte Overlays ersetzen.
+// Auswahl-Dialoge (Platzhalter)
 // ------------------------
-async function selectCharacterTarget(){
-  // Minimal: eigener Spieler
-  return { side:"me", kind:"player", index:0 };
-}
-async function selectAttackTarget(){
-  // Minimal: deine erste Attacke
-  return { charPath: { side:"me", kind:"player", index:0 }, attackIndex: 0 };
-}
-async function selectStackTarget(){
-  // Minimal: oberstes Stack-Element
-  return 0;
-}
+async function selectCharacterTarget(){ return { side:"me", kind:"player", index:0 }; }
+async function selectAttackTarget(){ return { charPath: { side:"me", kind:"player", index:0 }, attackIndex: 0 }; }
+async function selectStackTarget(){ return 0; }
 
-// ------------------------
-// Start
 // ------------------------
 showScreen(0);
