@@ -145,7 +145,7 @@ def submit_attacks(lobby_code:str, player_name:str, picks:list[str], rangeleien:
     lobby = get_lobby(lobby_code)
     c = _client_by_name(lobby, player_name)
 
-    # Picks als Attacke-Objekte sammeln (nur Namen → Attacke)
+    # Namen -> Attacke-Objekte
     chosen = []
     for n in picks:
         matches = [a for a in ATTACKS if a.name == n and ((not rangeleien and a.type==0) or (rangeleien and a.type==1))]
@@ -153,12 +153,23 @@ def submit_attacks(lobby_code:str, player_name:str, picks:list[str], rangeleien:
             raise RuntimeError(f"submit_attacks: unknown or mismatched attack name {n!r}")
         chosen.append(matches[0])
 
-    # Temporär merken, nicht direkt ins Spieler-Inventar schreiben!
+    # temporärer Puffer je Spieler
     if "_tmp_picks" not in lobby.__dict__:
         lobby._tmp_picks = {}
-    lobby._tmp_picks[c.spieler.name] = chosen
 
-    # Wenn beide fertig: Engine entscheidet und befüllt EINMAL
+    if not rangeleien:
+        # Erste Runde (normale Attacken) -> vollständig setzen
+        lobby._tmp_picks[c.spieler.name] = chosen
+    else:
+        # Zweite Runde (Rangeleien) -> zu bestehenden normalen Attacken hinzufügen
+        base = lobby._tmp_picks.get(c.spieler.name, [])
+        # Optional: nur erlauben, wenn "Immer vorbereitet" wirklich dabei ist
+        if not any(a.name == "Immer vorbereitet" for a in base):
+            # -> Entweder ignorieren, oder Fehler werfen. Ich werfe bewusst einen klaren Fehler:
+            raise RuntimeError("Rangeleien können nur gewählt werden, wenn 'Immer vorbereitet' unter den normalen Attacken gewählt wurde.")
+        lobby._tmp_picks[c.spieler.name] = base + chosen
+
+    # Wenn beide fertig: genau EINMAL in die Engine übernehmen
     if len(lobby.clients)==2 and all(cl.spieler.name in lobby._tmp_picks for cl in lobby.clients):
         eng.atk_entschieden(
             lobby,
