@@ -432,16 +432,20 @@ def lobby_snapshot(lobby: eng.Lobby | str):
     }
 
     # Stack-Items mit Ziel-Labels
+    # Stack-Items mit Ziel-Labels
     for idx, e in enumerate(lobby.stack.attacken):
-        owner_name = lobby.clients[e.owner.spieler_id].spieler.name if len(lobby.clients) > e.owner.spieler_id else "?"
+        owner_player = lobby.clients[e.owner.spieler_id].spieler.name if len(lobby.clients) > e.owner.spieler_id else "?"
+        owner_label = _char_label(lobby, e.owner)  # e.g. "Katrin – Monster 2" or "Katrin"
         atype = int(getattr(e.attacke, "type", 0))
         state["stack"].append({
             "index": idx,
             "name": e.attacke.name,
-            "owner": owner_name,
+            "owner": owner_label,          # <<< nice label for UI
+            "owner_player": owner_player,  # <<< raw player for color logic
             "atype": atype,
             "targets": _stack_target_label(lobby, e),
         })
+
 
     # Players vollständig serialisieren
     for i in range(len(lobby.clients)):
