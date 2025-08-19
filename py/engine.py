@@ -530,10 +530,15 @@ async def attacke_einsetzen(lobby: Lobby, owner: Spieler | Monster, attacke: Att
                         await passen(lobby)
                     else:
                         await attacken_ausführen(lobby)
+            # am Ende von attacke_einsetzen(...)
+
             else:
-                await lobby.clients[id].client.message("Attacke nicht einsetzbar")
+                # vorher:
+                # await lobby.clients[id].client.message("Attacke nicht einsetzbar")
+                reason = "kein Priority" if lobby.priority != id else "Bedingungen (Fenster/Keywords) nicht erfüllt"
+                await lobby.clients[id].client.message(f"Attacke nicht einsetzbar – {reason}")
         else:
-            await lobby.clients[id].client.message("Attacke nicht einsetzbar")
+            await lobby.clients[id].client.message("Attacke nicht einsetzbar – kein Priority")
 
 
 def other_spott(lobby: Lobby, target: Spieler | Monster):
