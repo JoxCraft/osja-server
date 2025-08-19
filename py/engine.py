@@ -110,7 +110,7 @@ nicht_Schnell = Keyword(name="nicht Schnell", text="kann immer nur in deiner Zug
 kein_Schaden = Keyword(name="kein Schaden", text="Attacke kann keinen Schaden machen", category=6)
 
 Alles_oder_nichts = Attacke(name="Alles oder nichts",
-                            text="Wähle eine deiner nicht Xmalig- und nicht Superattacken und"
+                            text="Wähle eine deiner nicht Xmalig- und nicht Superattacken und "
                                  "entferne sie vom Spiel. Führe sie am Ende des nächsten gegnerischen Zuges "
                                  "zweimal aus",
                             keywords=[Einmalig], type=0, targets=[True, True, 0, 0])
@@ -471,7 +471,10 @@ def is_possible(keys: set[Keyword], last: int, n_used: int, zweite_chance: bool,
             case 5:
                 nicht_schnell = True
     if not extra:
-        if not is_attack_left:
+        if is_my_turn:
+            if not is_first_slot:
+                return False
+        elif not is_attack_left:
             return False
     if not ((schnell and not nicht_schnell) or is_normal):
         return False
@@ -774,7 +777,7 @@ async def attacken_ausführen(lobby: Lobby):
                                            event=AttackeEingesetzt(attacke=dupe.attacke, owner=atk.owner, t_1=t_1,
                                                                    t_atk=t_atk, t_stk=t_stk, t_2=t_2))
                                 lobby.events.append(ev)
-                                lobby.events.append(ev)
+                                lobby.events.append(copy.deepcopy(ev))
                         case "Alles wird gut!":
                             resurrect(lobby, atk.owner)
                             resurrect(lobby, atk.owner)
