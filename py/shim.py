@@ -232,7 +232,12 @@ def set_flags(lobby_code:str, player_name:str, start:bool, end:bool, react:bool)
 async def submit_pay(lobby_code:str, player_name:str, amount:int):
     lobby = get_lobby(lobby_code)
     c = _client_by_name(lobby, player_name)
-    _paid[player_name] = max(0, int(amount))
+
+    # Source of truth: clamp + auf /5 abrunden
+    amt = max(0, int(amount))
+    amt = (amt // 5) * 5           # ← hier wird abgerundet
+
+    _paid[player_name] = amt
     if len(lobby.clients) == 2 and all(n in _paid for n in (lobby.clients[0].spieler.name, lobby.clients[1].spieler.name)):
         await eng.leben_zahlen(
             lobby,
@@ -241,6 +246,7 @@ async def submit_pay(lobby_code:str, player_name:str, amount:int):
         )
         _paid.clear()
     return True
+
 
 
 # ---------- UI-Aktionen Kampf ----------
