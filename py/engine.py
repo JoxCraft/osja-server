@@ -807,6 +807,7 @@ async def attacken_ausführen(lobby: Lobby):
                                 damage(lobby, 60, atk)
                         case "Geheime Mission":
                             damage(lobby, 90, atk)
+                            await lobby.clients[0].client.message("cast")
                         case "Gelbe Karte":
                             lobby.n_gelbe_Karte += 1
                             if lobby.n_gelbe_Karte != 2:
