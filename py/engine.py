@@ -482,7 +482,7 @@ def is_my_turn(lobby: Lobby, character: Spieler | Monster):
     id = character.spieler_id
     start = lobby.starting
     time = lobby.turntime
-    return (time // 5) % 2 == (id == start)
+    return (time // 5) % 2 != (id == start)
 
 
 async def attacke_einsetzen(lobby: Lobby, owner: Spieler | Monster, attacke: AttackeBesitz,
@@ -493,11 +493,10 @@ async def attacke_einsetzen(lobby: Lobby, owner: Spieler | Monster, attacke: Att
         if lobby.priority == id:
             start = lobby.starting
             time = lobby.turntime
-            is_my_turn = ((time // 5) % 2 == (id == start))
+            is_my_turn = ((time // 5) % 2 != (id == start))
             is_main = is_my_turn and ((time % 5) == 2)
             keys = set(attacke.attacke.keywords) | set(attacke.x_keywords)
             eingesetzt = owner.stats.atk_eingesetzt
-            await lobby.clients[id].client.message(str((owner,attacke,start,time,is_my_turn,is_main)))
             if is_possible(keys, time // 5 - attacke.last_used // 5, attacke.n_used,
                            any(ab.attacke is Zweite_Chance for ab in owner.stats.attacken),
                            (not lobby.reaktion and is_main), is_my_turn, not eingesetzt[0], not eingesetzt == (1, 1)):
