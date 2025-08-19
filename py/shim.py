@@ -391,27 +391,33 @@ def _stack_target_label(lobby: eng.Lobby, e: eng.AttackeEingesetzt):
         labels.append(f"Ziel 2: {_char_label(lobby, e.t_2)}")
     return labels
 
-def lobby_snapshot(lobby: eng.Lobby) -> dict:
-    state = {}
-    state["players"] = []
-    for c in lobby.clients.values():
-        sp = c.spieler
-        state["players"].append({
-            "name": sp.name,
-            "hp": sp.hp,
-            "attacks": [ab.name for ab in getattr(sp, "attacken", [])],
-            "monsters": [
-                {
-                    "hp": m.hp,
-                    "attacks": [ab.name for ab in getattr(m, "attacken", [])],
-                }
-                for m in sp.monster
-            ],
-            "known": [ab.name for ab in getattr(sp, "atk_known", [])],
-        })
+def lobby_snapshot(lobby: eng.Lobby):
+    # Screen/Turn-Metadaten (app.js erwartet diese Felder)
+    if lobby.phase == 0:
+        scr = 1
+    elif lobby.phase == 1:
+        scr = 2
+    elif lobby.phase == 2:
+        scr = 3
+    elif lobby.phase == 3:
+        scr = 4
+    else:
+        scr = 1
 
-    # Stack mitsamt Ziel-Labels
-    state["stack"] = []
+    has_two = len(lobby.clients) == 2
+    has_prio = (lobby.priority is not None) and has_two
+
+    state = {
+        "screen": scr,
+        "turn": lobby.turntime // 5,
+        "turntime": lobby.turntime,
+        "reaction": bool(lobby.reaktion),
+        "priority_name": (lobby.clients[lobby.priority].spieler.name if has_prio else "-"),
+        "stack": [],
+        "players": [],
+    }
+
+    # Stack-Items mit Namen der Ziele/Attacken/Stack-Referenzen
     for idx, e in enumerate(lobby.stack.attacken):
         owner_name = lobby.clients[e.owner.spieler_id].spieler.name if len(lobby.clients) > e.owner.spieler_id else "?"
         atype = int(getattr(e.attacke, "type", 0))
@@ -419,8 +425,14 @@ def lobby_snapshot(lobby: eng.Lobby) -> dict:
             "index": idx,
             "name": e.attacke.name,
             "owner": owner_name,
-            "atype": atype,
+            "atype": atype,                     # app.js färbt: blau (2), sonst grün/rot per owner
             "targets": _stack_target_label(lobby, e),
         })
 
+    # Players (voller Datensatz, wie app.js ihn rendert)
+    for i in range(len(lobby.clients)):          # WICHTIG: clients ist eine Liste, kein dict
+        sp = lobby.clients[i].spieler
+        state["players"].append(_ser_player(sp))
+
     return state
+
