@@ -164,7 +164,7 @@ Letzter_Wille = Attacke(name="Letzter Wille", text="5 Mal 20 Schaden", keywords=
                         targets=[True, 0, 0, 0])
 Meister_der_Magie = Attacke(name="Meister der Magie", text="30*(Anzahl ausgelöster Geheimnisse) Schaden", keywords=[],
                             type=0, targets=[True, 0, 0, 0])
-Messerstich = Attacke(name="Messerstich", text="30 Schaden", keywords=[Extra], type=0, targets=[True, 0, 0, 0])
+Messerstich = Attacke(name="Messerstich", text="20 Schaden", keywords=[Extra], type=0, targets=[True, 0, 0, 0])
 Messerwürfe = Attacke(name="Messerwürfe", text="4 Mal 20 Schaden", keywords=[], type=0, targets=[True, 0, 0, 0])
 Metallschild = Attacke(name="Metallschild", text="Attacken des Gegners machen 10 Schaden weniger", keywords=[Passiv],
                        type=0)
@@ -222,7 +222,7 @@ Zellteilung = Attacke(name="Zellteilung",
                       keywords=[], type=0, targets=[True, 0, 0, 0])
 Zwei_Wünsche = Attacke(name="Zwei Wünsche", text="Kontere eine Attacke", keywords=[Zweimalig, Schnell], type=0,
                        targets=[0, 0, True, 0])
-Zweite_Chance = Attacke(name="Zweite Chance", text="Deine einmaligen Attacken sind Zweimalig", keywords=[Passiv],
+Zweite_Chance = Attacke(name="Zweite Chance", text="Deine X-maligen Attacken sind (X+1)-malig", keywords=[Passiv],
                         type=0)
 Zyklus_des_Lebens = Attacke(name="Zyklus des Lebens",
                             text="Jedes Mal, wenn ein Monster ohne eine Geboren-Marke stirbt, wähle genau eine der "
@@ -857,7 +857,7 @@ async def attacken_ausführen(lobby: Lobby):
                         case "Meister der Magie":
                             damage(lobby, len(atk.owner.stats.ausgelöst) * 30, atk)
                         case "Messerstich":
-                            damage(lobby, 30, atk)
+                            damage(lobby, 20, atk)
                         case "Messerwürfe":
                             damage(lobby, 20, atk, 4)
                         case "Opfer":
@@ -978,4 +978,3 @@ async def attacken_ausführen(lobby: Lobby):
                     counter += 1
                 else:
                     break
-
