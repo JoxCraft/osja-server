@@ -391,29 +391,33 @@ function renderState(state) {
   `;
 
   if (selectedChar && selectedChar.side === "opp") {
+  if (selectedChar.kind === "player") {
+    // Beim Klick auf den GEGNERISCHEN SPIELER: known anzeigen
     ui.rightTitle.textContent = "Bekannte gegnerische Attacken";
     const known = (my && my.known) ? my.known : [];
     ui.charAttacks.innerHTML = known.map(a => fmtAtk(a)).join("");
-  } else if (selectedChar && selectedChar.side === "me" && my) {
-    const list = (selectedChar.kind === "player")
-      ? (my.attacks || [])
-      : ((my.monsters?.[selectedChar.index]?.attacks) || []);
+  } else {
+    // Beim Klick auf ein GEGNERISCHES MONSTER: dessen Attacken direkt zeigen
+    ui.rightTitle.textContent = "Gegnerisches Monster – Attacken";
+    const oppPlayer = (state.players || []).find(p => p.name !== localName) || null;
+    const list = oppPlayer?.monsters?.[selectedChar.index]?.attacks || [];
     ui.charAttacks.innerHTML = list.map((a,i)=>fmtAtk(a,i)).join("");
   }
+} else if (selectedChar && selectedChar.side === "me" && my) {
+  // Eigene Auswahl: wie gehabt
+  const list = (selectedChar.kind === "player")
+    ? (my.attacks || [])
+    : ((my.monsters?.[selectedChar.index]?.attacks) || []);
+  ui.charAttacks.innerHTML = list.map((a,i)=>fmtAtk(a,i)).join("");
+} else {
+  // Nichts ausgewählt – leer lassen
+  ui.charAttacks.innerHTML = "";
+}
+
 
   // Screen 2: bekannte Gegner-Attacken
-  if (state.screen === 2) {
-    const known = (my && Array.isArray(my.known)) ? my.known : [];
-    ui.oppKnown.innerHTML = known.map(a => `
-      <div class="atk">
-        <div><strong>${a.name}</strong></div>
-        <div class="small">${(a.keywords || []).join(", ")}</div>
-        <div class="small">${a.text}</div>
-      </div>
-    `).join("");
-  } else {
-    ui.oppKnown.innerHTML = "";
-  }
+  ui.oppKnown.innerHTML = "";
+  
 
   // Flags (Screen 2 & 3) spiegeln
   if (my && my.flags) {
@@ -614,8 +618,18 @@ ui.confirmPicks.addEventListener('click', async () => {
 });
 
 ui.payConfirm.addEventListener('click', async ()=>{
-  const amount = parseInt(ui.payInput.value || "0", 10);
-  if (isNaN(amount) || amount < 0) return;
+  const raw = parseInt(ui.payInput.value || "0", 10);
+  if (isNaN(raw) || raw < 0) return;
+
+  // NEU: unten abrunden auf Vielfaches von 5 und innerhalb [0, max]
+  const my = (lastState?.players || []).find(p => p.name === localName);
+  const max = Math.max(0, ((my?.hp ?? 500) - 200));
+  let amount = Math.min(max, raw);
+  amount = Math.floor(amount / 5) * 5;
+
+  // UI spiegeln, damit Nutzer die gerundete Zahl sieht
+  ui.payInput.value = String(amount);
+
   if (isHost) {
     await Host.call("submit_pay", { lobby_code: lobbyCodeVal, player_name: localName, amount });
     const snap = await Host.snapshot();
@@ -625,6 +639,7 @@ ui.payConfirm.addEventListener('click', async ()=>{
     await rpcAskHost("submit_pay", { name: localName, amount });
   }
 });
+
 
 // ==============================
 // Screen 3 – Kampfsteuerung
