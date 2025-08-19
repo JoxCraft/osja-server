@@ -17,11 +17,12 @@ let lastState = null;
 let syncingFlags = false;
 
 function readFlagsFromUI() {
-  const s = !!(ui.cbStart?.checked || ui.cbStart3?.checked);
-  const e = !!(ui.cbEnd?.checked   || ui.cbEnd3?.checked);
-  const r = !!(ui.cbReact?.checked || ui.cbReact3?.checked);
+  const s = (ui.cbStart3 ? ui.cbStart3.checked : !!ui.cbStart?.checked);
+  const e = (ui.cbEnd3   ? ui.cbEnd3.checked   : !!ui.cbEnd?.checked);
+  const r = (ui.cbReact3 ? ui.cbReact3.checked : !!ui.cbReact?.checked);
   return { start: s, end: e, react: r };
 }
+
 
 async function pushFlagsToServer() {
   const { start, end, react } = readFlagsFromUI();
@@ -438,7 +439,22 @@ function renderState(state) {
 
 
   // Screen 2: bekannte Gegner-Attacken
-  ui.oppKnown.innerHTML = "";
+// Screen 2: bekannte Gegner-Attacken (render)
+if (state.screen === 2) {
+  // "my" is your own player from the snapshot
+  const my = (state.players || []).find(p => p.name === localName) || null;
+  const known = my?.known || [];
+  ui.oppKnown.innerHTML = known.length
+    ? known.map(a => `
+        <div class="atk">
+          <div><strong>${a.name}</strong></div>
+          <div class="small">${(a.keywords || []).join(", ")}</div>
+          <div class="small">${a.text}</div>
+        </div>
+      `).join("")
+    : `<div class="small">— noch nichts bekannt —</div>`;
+}
+
   
 
   // Flags (Screen 2 & 3) spiegeln
@@ -632,15 +648,7 @@ ui.confirmPicks.addEventListener('click', async () => {
 // ==============================
 // Screen 2 – Leben zahlen + Flags
 // ==============================
-// Beide Checkbox-Sets (Screen 2 & 3) einheitlich behandeln (NEU)
-[ui.cbStart, ui.cbEnd, ui.cbReact, ui.cbStart3, ui.cbEnd3, ui.cbReact3]
-  .filter(Boolean)
-  .forEach(cb => {
-    cb.addEventListener('change', async ()=>{
-      if (syncingFlags) return;   // Render-Guard
-      await pushFlagsToServer();
-    });
-  });
+// Beide Checkbox-Sets (Screen 2 & 3) einheitlich behandeln (NEU) 2
 
 
 ui.payConfirm.addEventListener('click', async ()=>{
@@ -731,7 +739,7 @@ ui.playBtn.addEventListener('click', async ()=>{
 
 // Kampf-Checkboxen (Screen 3)
 
-// Beide Checkbox-Sets (Screen 2 & 3) einheitlich behandeln (NEU)
+// Beide Checkbox-Sets (Screen 2 & 3) einheitlich behandeln (NEU) 1
 [ui.cbStart, ui.cbEnd, ui.cbReact, ui.cbStart3, ui.cbEnd3, ui.cbReact3]
   .filter(Boolean)
   .forEach(cb => {
