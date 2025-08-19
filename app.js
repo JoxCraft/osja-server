@@ -787,17 +787,26 @@ async function selectCharacterTarget(){
   return { side:"me", kind:"player", index:0 };
 }
 async function selectAttackTarget(){
-  // Nimmt aktuell selektierte eigene Attacke (im rechten Panel)
-  const atkEl = document.querySelector('#char-attacks .atk.selected');
-  if (!atkEl || !selectedChar || selectedChar.side !== "me") {
-    const first = document.querySelector('#char-attacks .atk');
-    if (!first) return { charPath: { side:"me", kind:"player", index:0 }, ab_id: 0 };
-    first.classList.add('selected');
+  // Robuster Default-Owner (eigener Spieler), falls nichts selektiert wurde
+  if (!selectedChar) {
+    selectedChar = { side: "me", kind: "player", index: 0 };
   }
-  const el = document.querySelector('#char-attacks .atk.selected');
+
+  // Wenn keine Attacke markiert ist: die erste nehmen UND visuell markieren
+  let el = document.querySelector('#char-attacks .atk.selected');
+  if (!el) {
+    el = document.querySelector('#char-attacks .atk');
+    if (!el) {
+      // Fallback: trotzdem gültigen Pfad liefern
+      return { charPath: selectedChar, ab_id: 0 };
+    }
+    el.classList.add('selected');
+  }
+
   const abId = Number(el.getAttribute('data-abid'));
   return { charPath: selectedChar, ab_id: abId };
 }
+
 async function selectStackTarget(){
   // Default: oberstes Stack-Element
   return 0;
