@@ -365,9 +365,14 @@ function renderState(state) {
   }
 
   // Stack
-  if (state.stack) {
+  // Stack
+if (state.stack) {
   ui.stackView.innerHTML = state.stack.map(it => {
-    const colorClass = (it.atype === 2) ? "blue" : (it.owner === localName ? "green" : "red");
+    // color by player, show detailed owner label
+    const colorClass = (it.atype === 2)
+      ? "blue"
+      : (it.owner_player === localName ? "green" : "red");
+
     return `
       <div class="item ${colorClass}" data-stack-index="${it.index}">
         <div><strong>${it.name}</strong> (${it.owner})</div>
@@ -376,6 +381,7 @@ function renderState(state) {
     `;
   }).join("");
 }
+
 
 
   // Spieler nach Namen mappen
