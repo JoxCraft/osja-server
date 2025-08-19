@@ -706,6 +706,11 @@ async function handleRpc(op, data) {
   if (op === "getatk")  return await selectAttackTarget();
   if (op === "getstack")return await selectStackTarget();
 
+  if (op === "notify") {
+    if (data && data.text) log(String(data.text));
+    return true;
+  }
+  
   if (!isHost) return null;
 
   switch (op) {
