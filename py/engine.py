@@ -125,7 +125,7 @@ Finale = Attacke(name="Finale", text="150 Schaden", keywords=[Einmalig], type=0,
 Finales_Ritual = Attacke(name="Finales Ritual", text="(Menge dir Zugefügtem Schaden in deinem eigenen Zug) Schaden",
                          keywords=[Einmalig], type=0, targets=[True, 0, 0, 0])
 Freund_der_Tiere = Attacke(name="Freund der Tiere", text="Beschwöre ein 50/50 Monster", keywords=[], type=0)
-Gedankenkontrolle = Attacke(name="Gedankenkontrolle",
+Gedankenkontrolle = Attacke(name="Gedankenkontrolle (WIP)",
                             text="Dein Gegner verrät dir seine Attacken. Wähle dann eine seiner Attacken, setze sie "
                                  "ein, so als würde sie der Gegner einsetzen",
                             keywords=[Dreimalig], type=0)
@@ -156,7 +156,7 @@ Lebenslehre = Attacke(name="Lebenslehre", text="Verleihe einem Monster eine dein
                       keywords=[], type=0, targets=[True, True, 0, True])
 Lehren = Attacke(name="Lehren", text="Verleihe einem Charakter die Attacke Schwertschalag", keywords=[], type=0,
                  targets=[True, 0, 0, 0])
-Letzte_Chance = Attacke(name="Letzte Chance",
+Letzte_Chance = Attacke(name="Letzte Chance (WIP)",
                         text="Wenn du das nächste Mal tödlichen Schaden bekommen würdest, negiere jenen Schaden und "
                              "heile dir 50 Leben",
                         keywords=[Einmalig], type=0)
@@ -168,10 +168,10 @@ Messerstich = Attacke(name="Messerstich", text="20 Schaden", keywords=[Extra], t
 Messerwürfe = Attacke(name="Messerwürfe", text="4 Mal 20 Schaden", keywords=[], type=0, targets=[True, 0, 0, 0])
 Metallschild = Attacke(name="Metallschild", text="Attacken des Gegners machen 10 Schaden weniger", keywords=[Passiv],
                        type=0)
-Opfer = Attacke(name="Opfer",
+Opfer = Attacke(name="Opfer (WIP)",
                 text="Vernichte ein freundliches Monster. Alle befreundeten Charaktere erhalten seine Leben",
                 keywords=[], type=0, targets=[True, 0, 0, 0])
-Prestige = Attacke(name="Prestige", text="erhalte alle in diesen Spiel ausgelösten Geheimnisse", keywords=[Einmalig],
+Prestige = Attacke(name="Prestige (WIP)", text="erhalte alle in diesen Spiel ausgelösten Geheimnisse", keywords=[Einmalig],
                    type=0)
 Schild_und_Schwert = Attacke(name="Schild und Schwert", text="Verhindere 50 Schaden. 50 Schaden", keywords=[Schnell],
                              type=0, targets=[True, 0, True, 0])
@@ -194,7 +194,7 @@ Sichere_und_geheime_Mission = Attacke(name="Sichere und geheime Mission",
                                       type=0, targets=[True, 0, 0, 0])
 Sicherer_Schlag = Attacke(name="Sicherer Schlag", text="90 Schaden. Schaden nicht veränderbar", keywords=[], type=0,
                           targets=[True, 0, 0, 0])
-Spiegelschild = Attacke(name="Spiegelschild",
+Spiegelschild = Attacke(name="Spiegelschild (WIP)",
                         text="Wenn du das nächste Mal durch einen Gegner Schaden bekommen würdest, kriegt stattdessen "
                              "dieser Gegner so viel Schaden",
                         keywords=[Einmalig], type=0)
@@ -213,10 +213,10 @@ Waffen_weg = Attacke(name="Waffen weg!", text="Dein Gegner führt alle seine Att
 Wand = Attacke(name="Wand", text="Beschwöre ein 0/50 Monster mit Spott", keywords=[Zweimalig], type=0)
 Wut = Attacke(name="Wut", text="Deine nächste Attacke die Schaden macht, verursacht +20 Schaden",
               keywords=[Einmalig, Extra], type=0)
-Zauberkunststück = Attacke(name="Zauberkunststück",
+Zauberkunststück = Attacke(name="Zauberkunststück (WIP)",
                            text="Wähle eines von drei zufälligen Geheimnissen, der Nummern 1-7", keywords=[], type=0)
-Zaubertrick = Attacke(name="Zaubertrick", text="erhalte ein zufälliges Geheimnis", keywords=[], type=0)
-Zellteilung = Attacke(name="Zellteilung",
+Zaubertrick = Attacke(name="Zaubertrick (WIP)", text="erhalte ein zufälliges Geheimnis", keywords=[], type=0)
+Zellteilung = Attacke(name="Zellteilung (WIP)",
                       text="Opfere eines deiner Monster. Beschwöre ein Monster mit gleichen Leben und Attacken wie "
                            "das geopferte Monster am Ende deines Übernächsten Zuges zweimal",
                       keywords=[], type=0, targets=[True, 0, 0, 0])
@@ -224,7 +224,7 @@ Zwei_Wünsche = Attacke(name="Zwei Wünsche", text="Kontere eine Attacke", keywo
                        targets=[0, 0, True, 0])
 Zweite_Chance = Attacke(name="Zweite Chance", text="Deine X-maligen Attacken sind (X+1)-malig", keywords=[Passiv],
                         type=0)
-Zyklus_des_Lebens = Attacke(name="Zyklus des Lebens",
+Zyklus_des_Lebens = Attacke(name="Zyklus des Lebens (WIP)",
                             text="Jedes Mal, wenn ein Monster ohne eine Geboren-Marke stirbt, wähle genau eine der "
                                  "beiden Optionen aus: 1. Notiere dir die Leben und Attacken des Monsters 2. Belebe "
                                  "ein von dir notiertes Monster mit anderen Leben als das gestorbene Monster mit "
@@ -248,7 +248,7 @@ Grüne_Wiese = Attacke(name="Grüne Wiese",
                       text="Wenn Charaktere eine Attacke nicht in ihrem eigenen Zug ausführen, verursachen jene "
                            "Attacken 20 Schaden weniger",
                       keywords=[Passiv], type=1)
-Gutes_Auge = Attacke(name="Gutes Auge", text="Übernimm die Kontrolle über zwei zufällige Geheimnisse",
+Gutes_Auge = Attacke(name="Gutes Auge (WIP)", text="Übernimm die Kontrolle über zwei zufällige Geheimnisse",
                      keywords=[Einmalig], type=1)
 Heilung2 = Attacke(name="Heilung", text="Heile 80 Leben", keywords=[Super3], type=1, targets=[True, 0, 0, 0])
 Neu_geboren = Attacke(name="Neu geboren", text="Setze die Leben eines Gegners auf 500", keywords=[Extra],
@@ -256,7 +256,7 @@ Neu_geboren = Attacke(name="Neu geboren", text="Setze die Leben eines Gegners au
 Ruhe = Attacke(name="Ruhe", text="Alle Attacken machen ab jetzt 30 Schaden weniger und geben 30 Leben weniger",
                keywords=[Einmalig, Schnell], type=1)
 Sandsturm = Attacke(name="Sandsturm", text="Füge allen Gegnern 50 Schaden zu", keywords=[], type=1)
-Schuss_und_Schlag = Attacke(name="Schuss und Schlag",
+Schuss_und_Schlag = Attacke(name="Schuss und Schlag (WIP)",
                             text="Wähle bis zu zwei Ziele. Ziel 1 kriegt 70 Schaden und Ziel 2 30 + überschüssigen "
                                  "Schaden",
                             keywords=[], type=1, targets=[True, 0, 0, True])
@@ -424,11 +424,11 @@ async def passen(lobby: Lobby):
                     case 2:
                         found = True
                         lobby.priority = lobby.starting
-                    case 3, 9:
+                    case 3 | 9:
                         if lobby.clients[lobby.starting - 1].spieler.stop_end:
                             found = True
                             lobby.priority = (lobby.starting - 1) % 2
-                    case 4, 8:
+                    case 4 | 8:
                         if lobby.clients[lobby.starting].spieler.stop_end:
                             found = True
                             lobby.priority = lobby.starting
