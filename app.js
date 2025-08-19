@@ -232,7 +232,8 @@ from shim import *
 const Host = {
   mkLocalClient() {
     return {
-      message: async (text) => broadcast("msg", { text: `[Server] ${text}` }),
+      // NUR lokal loggen (kein Broadcast)
+      message: async (text) => { log(text); },
       getcharactertarget: async () => selectCharacterTarget(),
       getatktarget: async () => selectAttackTarget(),
       getstacktarget: async () => selectStackTarget(),
@@ -241,7 +242,11 @@ const Host = {
   },
   mkRemoteClient(remoteId) {
     return {
-      message: async (text) => broadcast("msg", { text }),
+      // Per RPC NUR an den Remote-Client schicken
+      message: async (text) => {
+        // einseitige Nachricht an remoteId
+        await channel.publish("rpc", { to: remoteId, op: "notify", data: { text }, reqId: null });
+      },
       getcharactertarget: async () => Host.rpcAsk(remoteId, "getchar"),
       getatktarget: async () => Host.rpcAsk(remoteId, "getatk"),
       getstacktarget: async () => Host.rpcAsk(remoteId, "getstack"),
