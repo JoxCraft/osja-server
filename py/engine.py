@@ -317,6 +317,7 @@ async def attacke_gewählt(lobby: Lobby, owner: Spieler | Monster, attacke: Atta
     if lobby.phase == 2:
         l = attacke.attacke.targets
         t_1, t_atk, t_stk, t_2 = await ask_targets(lobby.clients[owner.spieler_id].client, l[0], l[1], l[2], l[3])
+        lobby.clients[owner.spieler_id].client.message(str((t_1, t_atk, t_stk, t_2)))
         await attacke_einsetzen(lobby, owner, attacke, t_1, t_atk, t_stk, t_2)
 
 
