@@ -445,7 +445,7 @@ def is_possible(keys: set[Keyword], last: int, n_used: int, zweite_chance: bool,
                 is_first_slot: bool, is_attack_left: bool):
     if last < 0:
         return False
-    if last <= 1 and (not is_first_slot or is_my_turn):
+    if last <= 1 and (not (is_first_slot or is_my_turn)):
         return False
     extra = False
     schnell = False
@@ -500,7 +500,6 @@ async def attacke_einsetzen(lobby: Lobby, owner: Spieler | Monster, attacke: Att
             is_main = is_my_turn and ((time % 5) == 2)
             keys = set(attacke.attacke.keywords) | set(attacke.x_keywords)
             eingesetzt = owner.stats.atk_eingesetzt
-            await lobby.clients[id].client.message(str(eingesetzt))
             if is_possible(keys, time // 5 - attacke.last_used // 5, attacke.n_used,
                            any(ab.attacke is Zweite_Chance for ab in owner.stats.attacken),
                            (not lobby.reaktion and is_main), is_my_turn, not eingesetzt[0], not (eingesetzt == (True, True))):
@@ -517,6 +516,7 @@ async def attacke_einsetzen(lobby: Lobby, owner: Spieler | Monster, attacke: Att
                     else:
                         attacke.last_used = (time // 5 - (not is_my_turn)) * 5
                         owner.stats.atk_eingesetzt = (True, False)
+                await lobby.clients[id].client.message("First timeslot: " + str(eingesetzt[0]) + ", Second timeslot: " + str(eingesetzt[1]))
                 if kein_Schaden in keys:
                     e_atk = AttackeEingesetzt(attacke=attacke.attacke, owner=owner,
                                               t_1=t_1, t_atk=t_atk, t_stk=t_stk, t_2=t_2, nodmg=True)
