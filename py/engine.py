@@ -740,8 +740,8 @@ async def attacken_ausführen(lobby: Lobby):
     if lobby.phase == 2:
         stk_atk = lobby.stack.attacken
         counter = 1
-        await lobby.clients[0].client.message(str(stk_atk[-counter]))
         try:
+            await lobby.clients[0].client.message(str(stk_atk[-counter]))
             while stk_atk[-counter].ausgeführt != 1:
                 atk = stk_atk[-counter]
                 if atk.ausgeführt == 0:
