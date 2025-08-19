@@ -108,8 +108,8 @@ async def spieler_beitreten_py(lobby_code: str, spielername: str, js_client):
 
 # ---------- Cleanup: stale lobbies löschen ----------
 def cleanup_lobbies():
-    # lösche Lobbys, die in fortgeschrittener Phase sind, aber nicht voll
-    eng.lobbies[:] = [l for l in eng.lobbies if not (l.phase > 0 and len(l.clients) < 2)]
+    """Remove all lobbies that currently have no players (no clients) in them."""
+    eng.lobbies[:] = [l for l in eng.lobbies if len(l.clients) > 0]
 
 # ---------- Registry (robust, no dict by name) ----------
 def _collect_attacks():
