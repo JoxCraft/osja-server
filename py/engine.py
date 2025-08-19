@@ -519,7 +519,7 @@ async def attacke_einsetzen(lobby: Lobby, owner: Spieler | Monster, attacke: Att
                 else:
                     e_atk = AttackeEingesetzt(attacke=attacke.attacke, owner=owner,
                                               t_1=t_1, t_atk=t_atk, t_stk=t_stk, t_2=t_2)
-                if (not.owner.is_monster) and (attacke not in lobby.clients[id - 1].spieler.atk_known):
+                if (not owner.is_monster) and (attacke not in lobby.clients[id - 1].spieler.atk_known):
                     lobby.clients[id - 1].spieler.atk_known.append(attacke)
                 lobby.stack.attacken.append(e_atk)
                 if lobby.clients[id - 1].spieler.stop_react:
