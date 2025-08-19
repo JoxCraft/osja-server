@@ -679,7 +679,7 @@ def heilen(lobby: Lobby, attacke: AttackeEingesetzt, mod: int):
 def monster(lobby: Lobby, owner: Spieler | Monster, angriff: int, leben: int, spott: bool = 0):
     lobby.clients[owner.spieler_id].spieler.monster.append(
         Monster(stats=Stats(leben=leben, maxLeben=leben, spott=spott, atk_eingesetzt=(1, 0), attacken=[
-            AttackeBesitz(Attacke(name="Schaden", text=str(angriff) + " Schaden", type=2))]),
+            AttackeBesitz(Attacke(name="Schaden", text=str(angriff) + " Schaden", type=0))]),
                 spieler_id=owner.spieler_id))
 
 
