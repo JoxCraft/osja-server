@@ -391,7 +391,13 @@ def _stack_target_label(lobby: eng.Lobby, e: eng.AttackeEingesetzt):
         labels.append(f"Ziel 2: {_char_label(lobby, e.t_2)}")
     return labels
 
-def lobby_snapshot(lobby: eng.Lobby):
+def lobby_snapshot(lobby: eng.Lobby | str):
+    # Falls nur der Code übergeben wird, die echte Lobby holen
+    if isinstance(lobby, str):
+        lobby = get_lobby(lobby)
+    if not isinstance(lobby, eng.Lobby):
+        raise RuntimeError(f"lobby_snapshot: expected Lobby or code, got {type(lobby)}")
+
     # Screen/Turn-Metadaten (app.js erwartet diese Felder)
     if lobby.phase == 0:
         scr = 1
@@ -412,12 +418,13 @@ def lobby_snapshot(lobby: eng.Lobby):
         "turn": lobby.turntime // 5,
         "turntime": lobby.turntime,
         "reaction": bool(lobby.reaktion),
-        "priority_name": (lobby.clients[lobby.priority].spieler.name if has_prio else "-"),
+        "priority_name": (lobby.clients[lobby.priority].spieler.name
+                          if has_prio and 0 <= lobby.priority < len(lobby.clients) else "-"),
         "stack": [],
         "players": [],
     }
 
-    # Stack-Items mit Namen der Ziele/Attacken/Stack-Referenzen
+    # Stack-Items mit Ziel-Labels
     for idx, e in enumerate(lobby.stack.attacken):
         owner_name = lobby.clients[e.owner.spieler_id].spieler.name if len(lobby.clients) > e.owner.spieler_id else "?"
         atype = int(getattr(e.attacke, "type", 0))
@@ -425,14 +432,15 @@ def lobby_snapshot(lobby: eng.Lobby):
             "index": idx,
             "name": e.attacke.name,
             "owner": owner_name,
-            "atype": atype,                     # app.js färbt: blau (2), sonst grün/rot per owner
+            "atype": atype,
             "targets": _stack_target_label(lobby, e),
         })
 
-    # Players (voller Datensatz, wie app.js ihn rendert)
-    for i in range(len(lobby.clients)):          # WICHTIG: clients ist eine Liste, kein dict
+    # Players vollständig serialisieren
+    for i in range(len(lobby.clients)):
         sp = lobby.clients[i].spieler
         state["players"].append(_ser_player(sp))
 
     return state
+
 
