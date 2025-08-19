@@ -317,7 +317,6 @@ async def attacke_gewählt(lobby: Lobby, owner: Spieler | Monster, attacke: Atta
     if lobby.phase == 2:
         l = attacke.attacke.targets
         t_1, t_atk, t_stk, t_2 = await ask_targets(lobby.clients[owner.spieler_id].client, l[0], l[1], l[2], l[3])
-        await lobby.clients[owner.spieler_id].client.message(str((t_1, t_atk, t_stk, t_2)))
         await attacke_einsetzen(lobby, owner, attacke, t_1, t_atk, t_stk, t_2)
 
 
@@ -520,7 +519,7 @@ async def attacke_einsetzen(lobby: Lobby, owner: Spieler | Monster, attacke: Att
                 else:
                     e_atk = AttackeEingesetzt(attacke=attacke.attacke, owner=owner,
                                               t_1=t_1, t_atk=t_atk, t_stk=t_stk, t_2=t_2)
-                if attacke not in lobby.clients[id - 1].spieler.atk_known:
+                if (not.owner.is_monster) and (attacke not in lobby.clients[id - 1].spieler.atk_known):
                     lobby.clients[id - 1].spieler.atk_known.append(attacke)
                 lobby.stack.attacken.append(e_atk)
                 if lobby.clients[id - 1].spieler.stop_react:
@@ -805,7 +804,6 @@ async def attacken_ausführen(lobby: Lobby):
                                 damage(lobby, 60, atk)
                         case "Geheime Mission":
                             damage(lobby, 90, atk)
-                            await lobby.clients[0].client.message("cast")
                         case "Gelbe Karte":
                             lobby.n_gelbe_Karte += 1
                             if lobby.n_gelbe_Karte != 2:
