@@ -52,17 +52,39 @@ class PyClient:
         return await self.js.win()
 
     async def getcharactertarget(self):
-        sel = await self.js.getcharactertarget()      # {side,kind,index}
-        return _resolve_char_rel(self.lobby, self.owner_id, dict(sel))
+        sel = await self.js.getcharactertarget()
+        # WICHTIG: JsProxy → dict
+        try:
+            sel = sel.to_py()
+        except Exception:
+            pass
+        return _resolve_char_rel(self.lobby, self.owner_id, sel or {})
 
     async def getatktarget(self):
-        sel = await self.js.getatktarget()            # {charPath:{...}, ab_id:int}
-        ch = _resolve_char_rel(self.lobby, self.owner_id, dict(sel.get("charPath", {})))
-        ab = _find_ab_by_id_in_stats(ch.stats, int(sel.get("ab_id")))
+        sel = await self.js.getatktarget()
+        # WICHTIG: Vollständig nach Python konvertieren
+        try:
+            sel = sel.to_py()
+        except Exception:
+            pass
+        ch_path = (sel or {}).get("charPath", {}) or {}
+        try:
+            ch_path = ch_path.to_py()
+        except Exception:
+            pass
+        ch = _resolve_char_rel(self.lobby, self.owner_id, ch_path)
+        ab = _find_ab_by_id_in_stats(ch.stats, int((sel or {}).get("ab_id", 0)))
         return ch, ab
 
     async def getstacktarget(self):
-        return await self.js.getstacktarget()
+        idx = await self.js.getstacktarget()
+        # manche Browser liefern number-Proxy
+        try:
+            idx = int(idx)
+        except Exception:
+            pass
+        return idx
+
 
 # --- benutze PyClient beim Beitritt ---
 async def spieler_beitreten_py(lobby_code: str, spielername: str, js_client):
