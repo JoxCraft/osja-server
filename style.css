@@ -12,7 +12,18 @@ html,body{margin:0;background:var(--bg);color:#e6eef7;font-family:system-ui,-app
 .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px;min-width:240px}
 .scroll{max-height:60vh;overflow:auto}
 .messages{margin-bottom:12px}
-#messages-log{background:#0f1720;border:1px solid var(--line);padding:8px;border-radius:10px;min-height:36px;font-size:14px;opacity:.9}
+/* Log-Leiste begrenzen & scrollbar machen */
+#messages-log{
+  background:#0f1720;
+  border:1px solid var(--line);
+  padding:8px;
+  border-radius:10px;
+  min-height:36px;
+  max-height:140px;   /* NEU: Höhe begrenzen */
+  overflow:auto;      /* NEU: Scrollbar */
+  font-size:14px;
+  opacity:.9;
+}
 label{display:block;margin:8px 0}
 input[type="text"], input[type="number"]{width:260px;padding:8px;border-radius:8px;border:1px solid var(--line);background:#0f1720;color:#e6eef7}
 button{padding:10px 14px;border-radius:10px;border:1px solid var(--line);background:#1a2235;color:#e6eef7;cursor:pointer}
