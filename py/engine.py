@@ -751,12 +751,12 @@ async def attacken_ausführen(lobby: Lobby):
                         if not atk.owner.is_monster:
                             stürme = 0
                             for client in lobby.clients:
-                                for atk in client.spieler.stats.attacken:
-                                    if atk.attacke is Schneesturm:
+                                for attacke in client.spieler.stats.attacken:
+                                    if attacke.attacke is Schneesturm:
                                         stürme += 1
                                 for mon in client.spieler.monster:
-                                    for atk in mon.stats.attacken:
-                                        if atk.attacke is Schneesturm:
+                                    for attacke in mon.stats.attacken:
+                                        if attacke.attacke is Schneesturm:
                                             stürme += 1
                             if stürme > 0:
                                 if is_my_turn(lobby, atk.owner):
