@@ -497,14 +497,39 @@ async function rpcAskHost(op, data = {}) {
 // ==============================
 // Screen 1 – Attackenwahl
 // ==============================
+// ==============================
+// Screen 1 – Attackenwahl (FIXED)
+// ==============================
 ui.confirmPicks.addEventListener('click', async () => {
   if (picked.size === 0) { log("Bitte Attacken wählen."); return; }
 
-  // Umschalten auf Rangeleien nur für den, der "Immer vorbereitet" gewählt hat
+  // Wenn "Immer vorbereitet" dabei ist, erst die Basis an die Engine schicken,
+  // dann in den Rangeleien-Pool wechseln.
   if (!desireRangeleien && picked.has("Immer vorbereitet")) {
-    desireRangeleien = true;
+    const baseList = [...picked]; // Basis-Selection sichern
 
     try {
+      // 1) Basis sofort serverseitig speichern (markiert NICHT als complete)
+      if (isHost) {
+        const ok = await Host.call("submit_attacks", {
+          lobby_code: lobbyCodeVal,
+          player_name: localName,
+          picks: baseList,
+          rangeleien: false
+        });
+        if (!ok) { log("Wahl abgelehnt."); return; }
+      } else {
+        const ok = await rpcAskHost("submit_attacks", {
+          name: localName,
+          picks: baseList,
+          rangeleien: false
+        });
+        if (!ok) { log("Wahl abgelehnt."); return; }
+      }
+
+      // 2) Auf Rangeleien umschalten
+      desireRangeleien = true;
+
       if (isHost) {
         const rl = await Host.call("get_pool", { lobby_code: lobbyCodeVal, phase: 1, rangeleien: true });
         renderPool(rl);
@@ -512,6 +537,8 @@ ui.confirmPicks.addEventListener('click', async () => {
         const res = await rpcAskHost("get_pool_rangeleien", { lobby_code: lobbyCodeVal });
         renderPool(res.pool || []);
       }
+
+      // 3) UI zurücksetzen und auf 3 begrenzen
       picked.clear();
       ui.pickedList.innerHTML = "";
       ui.pickedCount.textContent = "0";
@@ -519,13 +546,21 @@ ui.confirmPicks.addEventListener('click', async () => {
       ui.pickedMax.textContent = "3";
       log("Wähle 3 Rangeleien.");
     } catch (e) {
-      console.error("Rangeleien-Pool laden fehlgeschlagen", e);
+      console.error("Rangeleien-Umschalten fehlgeschlagen", e);
+      if (e && e.message) console.error(e.message);
     }
     return;
   }
 
-  // Bestätigung
+  // Bestätigung: entweder normale Auswahl (ohne 'Immer vorbereitet')
+  // oder die 3 Rangeleien nach dem Umschalten.
   const list = [...picked];
+
+  // kleine Guard: für Rangeleien genau 3 fordern
+  if (desireRangeleien && list.length !== 3) {
+    log("Bitte genau 3 Rangeleien wählen.");
+    return;
+  }
 
   if (isHost) {
     try {
