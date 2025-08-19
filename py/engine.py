@@ -43,7 +43,7 @@ class Stats:
     wut: int = 0
     heil_wut: int = 0
     reduction: int = 0
-    atk_eingesetzt: (bool, bool) = (0, 0)  #vorher/nachher window, resettet am eigenen zuganfang dort nur window 1
+    atk_eingesetzt: (bool, bool) = (False, False)  #vorher/nachher window, resettet am eigenen zuganfang dort nur window 1
     # nutzbar
     dmgmod: int = 0
     n_selbstschaden: int = 0
@@ -375,14 +375,14 @@ async def leben_zahlen(lobby: Lobby, c1: Client, pay1: int, c2: Client, pay2: in
         c2.spieler.stats.leben -= pay2
         if pay1 > pay2:
             lobby.starting = lobby.priority = lobby.clients.index(c1)
-            c2.spieler.stats.atk_eingesetzt = (1, 0)
+            c2.spieler.stats.atk_eingesetzt = (True, False)
         elif pay2 > pay1:
             lobby.starting = lobby.priority = lobby.clients.index(c2)
-            c1.spieler.stats.atk_eingesetzt = (1, 0)
+            c1.spieler.stats.atk_eingesetzt = (True, False)
         else:
             start = random.randint(0, len(lobby.clients) - 1)
             lobby.starting = lobby.priority = start
-            lobby.clients[start - 1].spieler.stats.atk_eingesetzt = (1, 0)
+            lobby.clients[start - 1].spieler.stats.atk_eingesetzt = (True, False)
         await passen(lobby)
 
 
@@ -402,9 +402,9 @@ async def passen(lobby: Lobby):
                         if pl.stop_start:
                             found = True
                             lobby.priority = lobby.starting
-                        pl.stats.atk_eingesetzt = (pl.stats.atk_eingesetzt[1], 0)
+                        pl.stats.atk_eingesetzt = (pl.stats.atk_eingesetzt[1], False)
                         for monster in pl.monster:
-                            monster.stats.atk_eingesetzt = (monster.stats.atk_eingesetzt[1], 0)
+                            monster.stats.atk_eingesetzt = (monster.stats.atk_eingesetzt[1], False)
                     case 6:
                         if lobby.clients[lobby.starting].spieler.stop_start:
                             found = True
@@ -418,9 +418,9 @@ async def passen(lobby: Lobby):
                         if pl.stop_start:
                             found = True
                             lobby.priority = (lobby.starting - 1) % 2
-                        pl.stats.atk_eingesetzt = (pl.stats.atk_eingesetzt[1], 0)
+                        pl.stats.atk_eingesetzt = (pl.stats.atk_eingesetzt[1], False)
                         for monster in pl.monster:
-                            monster.stats.atk_eingesetzt = (monster.stats.atk_eingesetzt[1], 0)
+                            monster.stats.atk_eingesetzt = (monster.stats.atk_eingesetzt[1], False)
                     case 2:
                         found = True
                         lobby.priority = lobby.starting
@@ -499,20 +499,20 @@ async def attacke_einsetzen(lobby: Lobby, owner: Spieler | Monster, attacke: Att
             eingesetzt = owner.stats.atk_eingesetzt
             if is_possible(keys, time // 5 - attacke.last_used // 5, attacke.n_used,
                            any(ab.attacke is Zweite_Chance for ab in owner.stats.attacken),
-                           (not lobby.reaktion and is_main), is_my_turn, not eingesetzt[0], not eingesetzt == (1, 1)):
+                           (not lobby.reaktion and is_main), is_my_turn, not eingesetzt[0], not (eingesetzt == (True, True))):
                 attacke.n_used += 1
                 if Extra in keys:
-                    if eingesetzt == (1, 1):
+                    if eingesetzt == (True,True):
                         attacke.last_used = (time // 5 + 1) * 5
                     else:
                         attacke.last_used = (time // 5 - (not is_my_turn)) * 5
                 else:
-                    if eingesetzt == (1, 0):
+                    if eingesetzt == (True, False):
                         attacke.last_used = (time // 5 + 1) * 5
-                        owner.stats.atk_eingesetzt = (1, 1)
+                        owner.stats.atk_eingesetzt = (True, True)
                     else:
                         attacke.last_used = (time // 5 - (not is_my_turn)) * 5
-                        owner.stats.atk_eingesetzt = (1, 0)
+                        owner.stats.atk_eingesetzt = (True, False)
                 if kein_Schaden in keys:
                     e_atk = AttackeEingesetzt(attacke=attacke.attacke, owner=owner,
                                               t_1=t_1, t_atk=t_atk, t_stk=t_stk, t_2=t_2, nodmg=True)
@@ -677,7 +677,7 @@ def heilen(lobby: Lobby, attacke: AttackeEingesetzt, mod: int):
 
 def monster(lobby: Lobby, owner: Spieler | Monster, angriff: int, leben: int, spott: bool = 0):
     lobby.clients[owner.spieler_id].spieler.monster.append(
-        Monster(stats=Stats(leben=leben, maxLeben=leben, spott=spott, atk_eingesetzt=(1, 0), attacken=[
+        Monster(stats=Stats(leben=leben, maxLeben=leben, spott=spott, atk_eingesetzt=(True, False), attacken=[
             AttackeBesitz(Attacke(name="Schaden", text=str(angriff) + " Schaden", type=0,targets=[True,0,0,0]))]),
                 spieler_id=owner.spieler_id))
 
@@ -687,7 +687,7 @@ def resurrect(lobby: Lobby, target: Spieler | Monster):
     if sp.gy:
         mon = random.choice(sp.gy)
         mon.stats = Stats(leben=mon.stats.maxLeben, maxLeben=mon.stats.maxLeben, attacken=mon.stats.attacken,
-                          spott=mon.stats.spott, atk_eingesetzt=(1, 0))
+                          spott=mon.stats.spott, atk_eingesetzt=(True, False))
         sp.monster.append(mon)
         sp.gy.remove(mon)
 
@@ -914,7 +914,7 @@ async def attacken_ausführen(lobby: Lobby):
                                     ab.n_used += 1
                                 if any(k.category == 1 for k in keys):  # SuperN
                                     ab.last_used = (lobby.turntime // 5 - (not is_my_turn(lobby, sp))) * 5 \
-                                        if sp.stats.atk_eingesetzt == (0, 0) else (lobby.turntime // 5 + (
+                                        if sp.stats.atk_eingesetzt == (False, False) else (lobby.turntime // 5 + (
                                         not is_my_turn(lobby, sp))) * 5
                             verraten(lobby, atk.owner)
                         case "Wand":
