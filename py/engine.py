@@ -741,7 +741,6 @@ async def attacken_ausführen(lobby: Lobby):
         stk_atk = lobby.stack.attacken
         counter = 1
         if stk_atk:
-            await lobby.clients[0].client.message(str(stk_atk[-counter]))
             while stk_atk[-counter].ausgeführt != 1:
                 atk = stk_atk[-counter]
                 if atk.ausgeführt == 0:
@@ -764,7 +763,6 @@ async def attacken_ausführen(lobby: Lobby):
                                 else:
                                     lobby.clients[atk.owner.spieler_id - 1].spieler.stats.leben -= stürme * 10
                                 await check_winner(lobby)
-                    await lobby.clients[0].client.message("k")
                     match atk.attacke.name:
                         case "Alles oder nichts":
                             if atk.t_1 == atk.owner:
@@ -978,4 +976,8 @@ async def attacken_ausführen(lobby: Lobby):
                             add_wut(atk.owner, -10)
                     await check_winner(lobby)
                     check_monster(lobby)
-                counter += 1
+                if len(stk_atk)>counter:
+                    counter += 1
+                else:
+                    break
+
