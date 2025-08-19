@@ -373,20 +373,22 @@ def lobby_snapshot(lobby_code: str):
         "players": []
     }
 
-    for e in lobby.stack.attacken:
-        owner_name = lobby.clients[e.owner.spieler_id].spieler.name if len(lobby.clients) > e.owner.spieler_id else "?"
-        color = "blue" if e.attacke.type == 2 else "green"
-        tgts = []
-        if e.t_1 is not None: tgts.append("t1")
-        if e.t_atk is not None: tgts.append("t_atk")
-        if e.t_stk is not None: tgts.append(f"stack#{e.t_stk}")
-        if e.t_2 is not None: tgts.append("t2")
-        state["stack"].append({
-            "name": e.attacke.name,
-            "owner": owner_name,
-            "color": color,
-            "targets": tgts
-        })
+    for idx, e in enumerate(lobby.stack.attacken):
+    owner_name = lobby.clients[e.owner.spieler_id].spieler.name if len(lobby.clients) > e.owner.spieler_id else "?"
+    atype = int(getattr(e.attacke, "type", 0))
+    tgts = []
+    if e.t_1 is not None: tgts.append("t1")
+    if e.t_atk is not None: tgts.append("t_atk")
+    if e.t_stk is not None: tgts.append(f"stack#{e.t_stk}")
+    if e.t_2 is not None: tgts.append("t2")
+    state["stack"].append({
+        "index": idx,
+        "name": e.attacke.name,
+        "owner": owner_name,
+        "atype": atype,
+        "targets": tgts,
+    })
+
 
     for i in range(len(lobby.clients)):
         state["players"].append(_ser_player(lobby.clients[i].spieler))
