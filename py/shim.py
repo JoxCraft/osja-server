@@ -355,47 +355,72 @@ def _ser_player(sp: eng.Spieler):
     data["flags"] = { "start": bool(sp.stop_start), "end": bool(sp.stop_end), "react": bool(sp.stop_react) }
     return data
 
-def lobby_snapshot(lobby_code: str):
-    cleanup_lobbies()
-    lobby = get_lobby(lobby_code)
+def _char_label(lobby: eng.Lobby, ch: eng.Spieler | eng.Monster | None) -> str:
+    if ch is None:
+        return "-"
+    if isinstance(ch, eng.Spieler):
+        return ch.name
+    # Monster → Besitzer + Index ermitteln
+    sp = lobby.clients[ch.spieler_id].spieler
+    try:
+        idx = next(i for i, m in enumerate(sp.monster) if m is ch)
+    except StopIteration:
+        idx = -1
+    postfix = f"Monster {idx+1}" if idx >= 0 else "Monster"
+    return f"{sp.name} – {postfix}"
 
-    if lobby.phase == 0: scr = 1
-    elif lobby.phase == 1: scr = 2
-    elif lobby.phase == 2: scr = 3
-    elif lobby.phase == 3: scr = 4
-    else: scr = 1
+def _stack_target_label(lobby: eng.Lobby, e: eng.AttackeEingesetzt):
+    labels = []
+    if e.t_1 is not None:
+        labels.append(f"Ziel: {_char_label(lobby, e.t_1)}")
+    if e.t_atk is not None:
+        try:
+            nm = e.t_atk.attacke.name
+        except Exception:
+            nm = "?"
+        labels.append(f"Attacke: {nm}")
+    if e.t_stk is not None:
+        try:
+            other = lobby.stack.attacken[e.t_stk]
+            onm = other.attacke.name
+            own = lobby.clients[other.owner.spieler_id].spieler.name
+            labels.append(f"Stack: {onm} ({own})")
+        except Exception:
+            labels.append(f"Stack: #{e.t_stk}")
+    if e.t_2 is not None:
+        labels.append(f"Ziel 2: {_char_label(lobby, e.t_2)}")
+    return labels
 
-    has_two = len(lobby.clients) == 2
-    has_prio = (lobby.priority is not None) and has_two
+def lobby_snapshot(lobby: eng.Lobby) -> dict:
+    state = {}
+    state["players"] = []
+    for c in lobby.clients.values():
+        sp = c.spieler
+        state["players"].append({
+            "name": sp.name,
+            "hp": sp.hp,
+            "attacks": [ab.name for ab in getattr(sp, "attacken", [])],
+            "monsters": [
+                {
+                    "hp": m.hp,
+                    "attacks": [ab.name for ab in getattr(m, "attacken", [])],
+                }
+                for m in sp.monster
+            ],
+            "known": [ab.name for ab in getattr(sp, "atk_known", [])],
+        })
 
-    state = {
-        "screen": scr,
-        "turn": lobby.turntime // 5,
-        "turntime": lobby.turntime,
-        "reaction": bool(lobby.reaktion),
-        "priority_name": (lobby.clients[lobby.priority].spieler.name if has_prio else "-"),
-        "stack": [],
-        "players": []
-    }
-
+    # Stack mitsamt Ziel-Labels
+    state["stack"] = []
     for idx, e in enumerate(lobby.stack.attacken):
         owner_name = lobby.clients[e.owner.spieler_id].spieler.name if len(lobby.clients) > e.owner.spieler_id else "?"
         atype = int(getattr(e.attacke, "type", 0))
-        tgts = []
-        if e.t_1 is not None: tgts.append("t1")
-        if e.t_atk is not None: tgts.append("t_atk")
-        if e.t_stk is not None: tgts.append(f"stack#{e.t_stk}")
-        if e.t_2 is not None: tgts.append("t2")
         state["stack"].append({
             "index": idx,
             "name": e.attacke.name,
             "owner": owner_name,
             "atype": atype,
-            "targets": tgts,
+            "targets": _stack_target_label(lobby, e),
         })
-
-
-    for i in range(len(lobby.clients)):
-        state["players"].append(_ser_player(lobby.clients[i].spieler))
 
     return state
