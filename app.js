@@ -85,6 +85,14 @@ window.addEventListener("error", (e) => {
   console.error("Window error:", e.error || e);
 });
 
+window.addEventListener("beforeunload", () => {
+  try {
+    ablyChannel.publish("leave", { name: localName, lobby: lobbyCode });
+  } catch (e) {
+    console.debug("leave send failed", e);
+  }
+});
+
 // ==============================
 // Helpers
 // ==============================
