@@ -445,7 +445,7 @@ def is_possible(keys: set[Keyword], last: int, n_used: int, zweite_chance: bool,
                 is_first_slot: bool, is_attack_left: bool):
     if last < 0:
         return False
-    if last <= 1 and (is_first_slot or is_my_turn)):
+    if last <= 1 and (is_first_slot or is_my_turn):
         return False
     extra = False
     schnell = False
