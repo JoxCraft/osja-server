@@ -342,13 +342,17 @@ function renderState(state) {
 
   // Stack
   if (state.stack) {
-    ui.stackView.innerHTML = state.stack.map(item => `
-      <div class="item ${item.color}">
-        <div><strong>${item.name}</strong> (${item.owner})</div>
-        ${item.targets.map(t => `<div class="small">• ${t}</div>`).join("")}
+  ui.stackView.innerHTML = state.stack.map(it => {
+    const colorClass = (it.atype === 2) ? "blue" : (it.owner === localName ? "green" : "red");
+    return `
+      <div class="item ${colorClass}" data-stack-index="${it.index}">
+        <div><strong>${it.name}</strong> (${it.owner})</div>
+        ${it.targets.map(t => `<div class="small">• ${t}</div>`).join("")}
       </div>
-    `).join("");
-  }
+    `;
+  }).join("");
+}
+
 
   // Spieler nach Namen mappen
   let my = null, opp = null;
@@ -782,35 +786,145 @@ async function handleRpc(op, data) {
 // ==============================
 // Target selection placeholders (Engine fragt via ask_targets → PyClient → JS)
 // ==============================
+
+let selection = { mode: null, chosen: null, confirmBtn: null };
+function enterSelectionMode(label = "Ziel wählen") {
+  // Buttons verstecken
+  ui.passBtn.classList.add("hidden");
+  ui.playBtn.classList.add("hidden");
+
+  // Confirm-Button einfügen
+  const btn = document.createElement("button");
+  btn.id = "select-confirm-btn";
+  btn.textContent = label;
+  btn.disabled = true;
+  btn.className = "primary";
+  document.querySelector(".bottom-bar").appendChild(btn);
+  selection.confirmBtn = btn;
+}
+function leaveSelectionMode() {
+  if (selection.confirmBtn) {
+    selection.confirmBtn.remove();
+  }
+  selection = { mode: null, chosen: null, confirmBtn: null };
+  ui.passBtn.classList.remove("hidden");
+  ui.playBtn.classList.remove("hidden");
+}
+
+
 async function selectCharacterTarget(){
-  // Default: eigener Spieler
-  return { side:"me", kind:"player", index:0 };
+  return new Promise(resolve => {
+    enterSelectionMode("Ziel wählen");
+
+    let pick = null;
+    const onPick = (e) => {
+      const el = e.target.closest(".member");
+      if (!el) return;
+      // Visuelle Markierung
+      ui.friends.querySelectorAll(".member").forEach(x=>x.classList.remove("selected"));
+      ui.enemies.querySelectorAll(".member").forEach(x=>x.classList.remove("selected"));
+      el.classList.add("selected");
+
+      pick = {
+        side: el.dataset.side,
+        kind: el.dataset.kind,
+        index: parseInt(el.dataset.index, 10)
+      };
+      selection.confirmBtn.disabled = false;
+    };
+
+    ui.friends.addEventListener("click", onPick);
+    ui.enemies.addEventListener("click", onPick);
+
+    const onConfirm = () => {
+      ui.friends.removeEventListener("click", onPick);
+      ui.enemies.removeEventListener("click", onPick);
+      leaveSelectionMode();
+      resolve(pick || { side:"me", kind:"player", index:0 });
+    };
+    selection.confirmBtn.addEventListener("click", onConfirm, { once: true });
+  });
 }
+
 async function selectAttackTarget(){
-  // Robuster Default-Owner (eigener Spieler), falls nichts selektiert wurde
-  if (!selectedChar) {
-    selectedChar = { side: "me", kind: "player", index: 0 };
-  }
+  return new Promise(resolve => {
+    enterSelectionMode("Ziel wählen");
 
-  // Wenn keine Attacke markiert ist: die erste nehmen UND visuell markieren
-  let el = document.querySelector('#char-attacks .atk.selected');
-  if (!el) {
-    el = document.querySelector('#char-attacks .atk');
-    if (!el) {
-      // Fallback: trotzdem gültigen Pfad liefern
-      return { charPath: selectedChar, ab_id: 0 };
-    }
-    el.classList.add('selected');
-  }
+    // 1) Zuerst Charakter auswählen (Besitzer der Ziel-Attacke)
+    let pickedChar = null;
+    const onPickChar = (e) => {
+      const el = e.target.closest(".member");
+      if (!el) return;
 
-  const abId = Number(el.getAttribute('data-abid'));
-  return { charPath: selectedChar, ab_id: abId };
+      ui.friends.querySelectorAll(".member").forEach(x=>x.classList.remove("selected"));
+      ui.enemies.querySelectorAll(".member").forEach(x=>x.classList.remove("selected"));
+      el.classList.add("selected");
+
+      pickedChar = {
+        side: el.dataset.side,
+        kind: el.dataset.kind,
+        index: parseInt(el.dataset.index, 10)
+      };
+      // rechte Spalte für diesen Charakter anzeigen
+      selectedChar = pickedChar;
+      renderState(lastState);
+
+      // Angriffe anklickbar machen
+      ui.charAttacks.querySelectorAll(".atk").forEach(a => {
+        a.addEventListener("click", ()=>{
+          ui.charAttacks.querySelectorAll(".atk").forEach(x=>x.classList.remove("selected"));
+          a.classList.add("selected");
+          selection.confirmBtn.disabled = false;
+        }, { once: true });
+      });
+    };
+
+    ui.friends.addEventListener("click", onPickChar);
+    ui.enemies.addEventListener("click", onPickChar);
+
+    const onConfirm = () => {
+      ui.friends.removeEventListener("click", onPickChar);
+      ui.enemies.removeEventListener("click", onPickChar);
+
+      // gewählte Attacke ermitteln
+      const el = document.querySelector("#char-attacks .atk.selected");
+      const abId = el ? Number(el.getAttribute("data-abid")) : 0;
+
+      const res = { charPath: pickedChar || { side:"me", kind:"player", index:0 }, ab_id: abId };
+      leaveSelectionMode();
+      resolve(res);
+    };
+
+    selection.confirmBtn.addEventListener("click", onConfirm, { once: true });
+  });
 }
+
 
 async function selectStackTarget(){
-  // Default: oberstes Stack-Element
-  return 0;
+  return new Promise(resolve => {
+    enterSelectionMode("Ziel wählen");
+    let idx = null;
+
+    const onPick = (e) => {
+      const el = e.target.closest(".item");
+      if (!el) return;
+      ui.stackView.querySelectorAll(".item").forEach(x=>x.classList.remove("selected"));
+      el.classList.add("selected");
+      idx = parseInt(el.getAttribute("data-stack-index"), 10);
+      selection.confirmBtn.disabled = (isNaN(idx));
+    };
+    ui.stackView.addEventListener("click", onPick);
+
+    const onConfirm = () => {
+      ui.stackView.removeEventListener("click", onPick);
+      const val = Number.isInteger(idx) ? idx : 0;
+      leaveSelectionMode();
+      resolve(val);
+    };
+    selection.confirmBtn.addEventListener("click", onConfirm, { once: true });
+  });
 }
+
 
 // ==============================
 // Host ensure + initial pool
