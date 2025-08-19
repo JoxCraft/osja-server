@@ -14,6 +14,28 @@ let pyodide, pyReady = false, isHost = false, lobbyCreated = false;
 let screen = 0;
 let lastState = null;
 
+let syncingFlags = false;
+
+function readFlagsFromUI() {
+  const s = !!(ui.cbStart?.checked || ui.cbStart3?.checked);
+  const e = !!(ui.cbEnd?.checked   || ui.cbEnd3?.checked);
+  const r = !!(ui.cbReact?.checked || ui.cbReact3?.checked);
+  return { start: s, end: e, react: r };
+}
+
+async function pushFlagsToServer() {
+  const { start, end, react } = readFlagsFromUI();
+  if (isHost) {
+    await Host.call("set_flags", { lobby_code: lobbyCodeVal, player_name: localName, start, end, react });
+    const snap = await Host.snapshot();
+    renderState(snap);
+    await broadcast("state", { ...snap, force: true });
+  } else {
+    await rpcAskHost("set_flags", { name: localName, start, end, react });
+  }
+}
+
+
 const ui = {
   screens: [...document.querySelectorAll('.screen')],
   messages: document.getElementById('messages-log'),
@@ -420,7 +442,9 @@ function renderState(state) {
   
 
   // Flags (Screen 2 & 3) spiegeln
-  if (my && my.flags) {
+if (my && my.flags) {
+  syncingFlags = true;
+  try {
     if (ui.cbStart)  ui.cbStart.checked  = !!my.flags.start;
     if (ui.cbEnd)    ui.cbEnd.checked    = !!my.flags.end;
     if (ui.cbReact)  ui.cbReact.checked  = !!my.flags.react;
@@ -428,7 +452,11 @@ function renderState(state) {
     if (ui.cbStart3) ui.cbStart3.checked = !!my.flags.start;
     if (ui.cbEnd3)   ui.cbEnd3.checked   = !!my.flags.end;
     if (ui.cbReact3) ui.cbReact3.checked = !!my.flags.react;
+  } finally {
+    setTimeout(()=>{ syncingFlags = false; }, 0);
   }
+}
+
 
   // Buttons en/disablen
   if (state.screen >= 3 && state.priority_name) {
@@ -604,18 +632,16 @@ ui.confirmPicks.addEventListener('click', async () => {
 // ==============================
 // Screen 2 – Leben zahlen + Flags
 // ==============================
-[ui.cbStart, ui.cbEnd, ui.cbReact].forEach((cb) => {
-  cb.addEventListener('change', async ()=>{
-    if (isHost) {
-      await Host.call("set_flags", { lobby_code: lobbyCodeVal, player_name: localName, start: ui.cbStart.checked, end: ui.cbEnd.checked, react: ui.cbReact.checked });
-      const snap = await Host.snapshot();
-      renderState(snap);
-      await broadcast("state", { ...snap, force: true });
-    } else {
-      await rpcAskHost("set_flags", { name: localName, start: ui.cbStart.checked, end: ui.cbEnd.checked, react: ui.cbReact.checked });
-    }
+// Beide Checkbox-Sets (Screen 2 & 3) einheitlich behandeln (NEU)
+[ui.cbStart, ui.cbEnd, ui.cbReact, ui.cbStart3, ui.cbEnd3, ui.cbReact3]
+  .filter(Boolean)
+  .forEach(cb => {
+    cb.addEventListener('change', async ()=>{
+      if (syncingFlags) return;   // Render-Guard
+      await pushFlagsToServer();
+    });
   });
-});
+
 
 ui.payConfirm.addEventListener('click', async ()=>{
   const raw = parseInt(ui.payInput.value || "0", 10);
@@ -704,18 +730,16 @@ ui.playBtn.addEventListener('click', async ()=>{
 });
 
 // Kampf-Checkboxen (Screen 3)
-[ui.cbStart3, ui.cbEnd3, ui.cbReact3].forEach((cb) => {
-  cb.addEventListener('change', async ()=>{
-    if (isHost) {
-      await Host.call("set_flags", { lobby_code: lobbyCodeVal, player_name: localName, start: ui.cbStart3.checked, end: ui.cbEnd3.checked, react: ui.cbReact3.checked });
-      const snap = await Host.snapshot();
-      renderState(snap);
-      await broadcast("state", { ...snap, force: true });
-    } else {
-      await rpcAskHost("set_flags", { name: localName, start: ui.cbStart3.checked, end: ui.cbEnd3.checked, react: ui.cbReact3.checked });
-    }
+
+// Beide Checkbox-Sets (Screen 2 & 3) einheitlich behandeln (NEU)
+[ui.cbStart, ui.cbEnd, ui.cbReact, ui.cbStart3, ui.cbEnd3, ui.cbReact3]
+  .filter(Boolean)
+  .forEach(cb => {
+    cb.addEventListener('change', async ()=>{
+      if (syncingFlags) return;   // Render-Guard
+      await pushFlagsToServer();
+    });
   });
-});
 
 // ==============================
 // RPC handler (nicht-Host Eingaben, Host führt Python aus)
