@@ -17,9 +17,10 @@ let lastState = null;
 let syncingFlags = false;
 
 function readFlagsFromUI() {
-  const s = (ui.cbStart3 ? ui.cbStart3.checked : !!ui.cbStart?.checked);
-  const e = (ui.cbEnd3   ? ui.cbEnd3.checked   : !!ui.cbEnd?.checked);
-  const r = (ui.cbReact3 ? ui.cbReact3.checked : !!ui.cbReact?.checked);
+  const onFight = (screen === 3); // nur Screen 3 hat die *-3 Inputs „aktiv“ gedacht
+  const s = onFight ? !!ui.cbStart3?.checked : !!ui.cbStart?.checked;
+  const e = onFight ? !!ui.cbEnd3?.checked   : !!ui.cbEnd?.checked;
+  const r = onFight ? !!ui.cbReact3?.checked : !!ui.cbReact?.checked;
   return { start: s, end: e, react: r };
 }
 
@@ -652,27 +653,43 @@ ui.confirmPicks.addEventListener('click', async () => {
 
 
 ui.payConfirm.addEventListener('click', async ()=>{
-  const raw = parseInt(ui.payInput.value || "0", 10);
-  if (isNaN(raw) || raw < 0) return;
+  if (ui.payConfirm.disabled) return; // extra safety
+  ui.payConfirm.disabled = true;
 
-  // NEU: unten abrunden auf Vielfaches von 5 und innerhalb [0, max]
-  const my = (lastState?.players || []).find(p => p.name === localName);
-  const max = Math.max(0, ((my?.hp ?? 500) - 200));
-  let amount = Math.min(max, raw);
-  amount = Math.floor(amount / 5) * 5;
+  try {
+    const raw = parseInt(ui.payInput.value || "0", 10);
+    if (isNaN(raw) || raw < 0) {
+      ui.payInput.value = "0";
+      return;
+    }
 
-  // UI spiegeln, damit Nutzer die gerundete Zahl sieht
-  ui.payInput.value = String(amount);
+    // unten abrunden auf Vielfaches von 5 und innerhalb [0, max]
+    const my = (lastState?.players || []).find(p => p.name === localName);
+    const max = Math.max(0, ((my?.hp ?? 500) - 200));
+    let amount = Math.min(max, raw);
+    amount = Math.floor(amount / 5) * 5;
 
-  if (isHost) {
-    await Host.call("submit_pay", { lobby_code: lobbyCodeVal, player_name: localName, amount });
-    const snap = await Host.snapshot();
-    renderState(snap);
-    await broadcast("state", { ...snap, force: true });
-  } else {
-    await rpcAskHost("submit_pay", { name: localName, amount });
+    // UI spiegeln
+    ui.payInput.value = String(amount);
+
+    if (isHost) {
+      await Host.call("submit_pay", { lobby_code: lobbyCodeVal, player_name: localName, amount });
+      const snap = await Host.snapshot();
+      renderState(snap);
+      await broadcast("state", { ...snap, force: true });
+    } else {
+      await rpcAskHost("submit_pay", { name: localName, amount });
+    }
+
+    log(`Zahlung gesetzt: ${amount}`);
+  } catch (e) {
+    console.error("payConfirm error", e);
+    if (e?.message) log(`Fehler beim Bezahlen: ${e.message}`);
+  } finally {
+    ui.payConfirm.disabled = false;
   }
 });
+
 
 
 // ==============================
@@ -739,15 +756,16 @@ ui.playBtn.addEventListener('click', async ()=>{
 
 // Kampf-Checkboxen (Screen 3)
 
-// Beide Checkbox-Sets (Screen 2 & 3) einheitlich behandeln (NEU) 1
+// Beide Checkbox-Sets (Screen 2 & 3) einheitlich behandeln
 [ui.cbStart, ui.cbEnd, ui.cbReact, ui.cbStart3, ui.cbEnd3, ui.cbReact3]
   .filter(Boolean)
   .forEach(cb => {
-    cb.addEventListener('change', async ()=>{
-      if (syncingFlags) return;   // Render-Guard
+    cb.addEventListener('change', async () => {
+      if (syncingFlags) return;   // verhindert Ping-Pong beim Rendern
       await pushFlagsToServer();
     });
   });
+
 
 // ==============================
 // RPC handler (nicht-Host Eingaben, Host führt Python aus)
