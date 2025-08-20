@@ -580,8 +580,8 @@ def real_damage_calc(lobby: Lobby, damage: int, attacke: AttackeEingesetzt, targ
         mod = owner.stats.dmgmod
         owner.stats.dmgmod = 0
         if is_my_turn(lobby, owner):
-            return max(0, damage + owner.stats.wut + mod + lobby.atkmod - target.stats.reduction + attacke.mod - (
-                    sum(ab.attacke is Metallschild for ab in target.stats.attacken) * 10)) * anzahl
+            return max(0, damage + owner.stats.wut + mod + lobby.atkmod - target.stats.reduction  - (
+                    sum(ab.attacke is Metallschild for ab in target.stats.attacken) * 10)) * anzahl + attacke.mod
         else:
             wiesen = 0
             for client in lobby.clients:
