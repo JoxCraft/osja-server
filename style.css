@@ -36,7 +36,16 @@ button:disabled{opacity:.5;cursor:not-allowed}
 #attacks-pool .atk.selected, #char-attacks .atk.selected{outline:2px solid var(--accent)}
 .hint{opacity:.7;font-size:12px;margin-top:6px}
 .tiny-toggles label{font-size:14px;opacity:.9}
-.hud{display:flex;gap:16px;margin:6px 0 10px;opacity:.9}
+.hud{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:16px;
+  margin:6px 0 10px;
+  opacity:.9;
+}
+.hud-left{ display:flex; gap:16px; align-items:center; }
+.hud-right{ display:flex; gap:8px; }
 .stack .item{border:1px solid var(--line);border-radius:10px;padding:8px;margin:8px 0}
 .stack .item.blue{border-color:var(--blue)}
 .stack .item.green{border-color:var(--green)}
@@ -49,3 +58,11 @@ button:disabled{opacity:.5;cursor:not-allowed}
 .bottom-bar{justify-content:space-between;margin-top:8px}
 .result{font-size:20px;font-weight:700}
 .small{font-size:12px;opacity:.8}
+.sum-card{
+  border:1px solid var(--line);
+  border-radius:10px;
+  padding:10px;
+  margin:8px 0;
+  background:#0f1720;
+}
+
