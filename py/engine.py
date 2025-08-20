@@ -456,7 +456,7 @@ def is_possible(keys: set[Keyword], last: int, n_used: int, zweite_chance: bool,
                 if n_used >= key.value + zweite_chance:
                     return False
             case 1:
-                if (last - ((not is_my_turn) * (2 * is_first_slot - 1))) // 2 <= key.value:
+                if (last - ((not is_my_turn) * (2 * (not is_first_slot) - 1))) // 2 < key.value:
                     return False
                 # last = Differenz in ZÜGEN  seit letzter Nutzung.
                 # Eigener Zug:     last//2 <= key.value
