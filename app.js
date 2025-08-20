@@ -72,9 +72,15 @@ const ui = {
   charAttacks: document.getElementById('char-attacks'),
   passBtn: document.getElementById('pass-btn'),
   playBtn: document.getElementById('play-btn'),
+  // Neue Buttons (Screen 3)
+  resignBtn: document.getElementById('resign-btn'),
+  drawBtn: document.getElementById('draw-btn'),
   // Screen 4
-  winner: document.getElementById('winner-text')
+  winner: document.getElementById('winner-text'),
+  summary: document.getElementById('summary'),
+  rematchBtn: document.getElementById('rematch-btn'),
 };
+
 
 // Error Logging
 window.addEventListener("unhandledrejection", (e) => {
@@ -87,7 +93,9 @@ window.addEventListener("error", (e) => {
 
 window.addEventListener("beforeunload", () => {
   try {
-    ablyChannel.publish("leave", { name: localName, lobby: lobbyCode });
+    if (channel && localName && lobbyCodeVal) {
+      channel.publish("leave", { name: localName, lobby: lobbyCodeVal });
+    }
   } catch (e) {
     console.debug("leave send failed", e);
   }
@@ -501,6 +509,42 @@ if (my && my.flags) {
     const max = Math.max(0, (my.hp ?? 500) - 200);
     ui.payInput.max = String(max);
   }
+
+    // Winner Screen
+  if (state.screen === 4) {
+    const w = state.winner || "-";
+    ui.winner.textContent = (w === "Tie") ? "Unentschieden" : `Sieger: ${w}`;
+
+    const players = state.players || [];
+    const lines = players.map(p => {
+      const ex = p.extra || {};
+      return `<div class="sum-card">
+        <div><strong>${p.name}</strong></div>
+        <div class="small">HP: ${p.hp}/${p.max}</div>
+        <div class="small">Attacken ausgeführt: ${ex.attacks_used ?? "-"}</div>
+        <div class="small">Eigenschaden: ${ex.self_damage ?? "-"}</div>
+        <div class="small">Monster: ${ex.monsters_alive ?? 0} (Friedhof: ${ex.monsters_gy ?? 0})</div>
+      </div>`;
+    }).join("");
+    ui.summary.innerHTML = lines || "";
+  }
+
+    // Draw-Button Status-Text
+  if (ui.drawBtn) {
+    const by = state.draw_offer_by || null;
+    if (!by) {
+      ui.drawBtn.textContent = "Unentschieden anbieten";
+      ui.drawBtn.disabled = false;
+    } else if (by === localName) {
+      ui.drawBtn.textContent = "Angebot zurückziehen";
+      ui.drawBtn.disabled = false;
+    } else {
+      ui.drawBtn.textContent = "Unentschieden annehmen";
+      ui.drawBtn.disabled = false;
+    }
+  }
+
+
 }
 
 function renderPool(attacks) {
@@ -768,6 +812,45 @@ ui.playBtn.addEventListener('click', async ()=>{
   }
 });
 
+// Aufgeben
+ui.resignBtn?.addEventListener('click', async ()=>{
+  if (isHost) {
+    await Host.call("ui_resign", { lobby_code: lobbyCodeVal, player_name: localName });
+    const snap = await Host.snapshot();
+    renderState(snap);
+    await broadcast("state", { ...snap, force: true });
+  } else {
+    await rpcAskHost("resign", { name: localName });
+  }
+});
+
+// Unentschieden anbieten/annahmen/withdraw
+ui.drawBtn?.addEventListener('click', async ()=>{
+  if (isHost) {
+    await Host.call("ui_draw_toggle", { lobby_code: lobbyCodeVal, player_name: localName });
+    const snap = await Host.snapshot();
+    renderState(snap);
+    await broadcast("state", { ...snap, force: true });
+  } else {
+    await rpcAskHost("draw_toggle", { name: localName });
+  }
+});
+
+// Rematch
+ui.rematchBtn?.addEventListener('click', async ()=>{
+  if (isHost) {
+    await Host.call("ui_rematch", { lobby_code: lobbyCodeVal });
+    const pool = await Host.call("get_pool", { lobby_code: lobbyCodeVal, phase: 1, rangeleien: false });
+    await broadcast("pool", { pool, rangeleien: false });
+    const snap = await Host.snapshot();
+    renderState(snap);
+    await broadcast("state", { ...snap, force: true });
+  } else {
+    await rpcAskHost("rematch", {});
+  }
+});
+
+
 // Kampf-Checkboxen (Screen 3)
 
 // Beide Checkbox-Sets (Screen 2 & 3) einheitlich behandeln
@@ -815,6 +898,26 @@ async function handleRpc(op, data) {
       const snap = await Host.snapshot();
       await broadcast("state", { ...snap, force: true });
       return ok;
+    }
+        case "resign": {
+      await Host.call("ui_resign", { lobby_code: lobbyCodeVal, player_name: data.name });
+      const snap = await Host.snapshot();
+      await broadcast("state", { ...snap, force: true });
+      return true;
+    }
+    case "draw_toggle": {
+      const res = await Host.call("ui_draw_toggle", { lobby_code: lobbyCodeVal, player_name: data.name });
+      const snap = await Host.snapshot();
+      await broadcast("state", { ...snap, force: true });
+      return res;
+    }
+    case "rematch": {
+      await Host.call("ui_rematch", { lobby_code: lobbyCodeVal });
+      const pool = await Host.call("get_pool", { lobby_code: lobbyCodeVal, phase: 1, rangeleien: false });
+      await broadcast("pool", { pool, rangeleien: false });
+      const snap = await Host.snapshot();
+      await broadcast("state", { ...snap, force: true });
+      return true;
     }
     case "set_flags": {
       await Host.call("set_flags", {
