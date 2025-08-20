@@ -69,11 +69,18 @@
 
     <!-- Screen 3: Kampf -->
     <section id="screen3" class="screen hidden">
-      <div class="hud">
-        <div>Zug: <span id="turn-num">-</span></div>
-        <div>Zeit: <span id="turn-phase">-</span></div>
-        <div>Priority: <span id="priority-name">-</span></div>
+      <div class="hud" style="justify-content:space-between; width:100%">
+        <div class="hud-left">
+          <div>Zug: <span id="turn-num">-</span></div>
+          <div>Zeit: <span id="turn-phase">-</span></div>
+          <div>Priority: <span id="priority-name">-</span></div>
+        </div>
+        <div class="hud-right">
+          <button id="draw-btn">Unentschieden …</button>
+          <button id="resign-btn">Aufgeben</button>
+        </div>
       </div>
+
 
       <div class="row tiny-toggles">
         <label><input type="checkbox" id="cb-start-3" /> Zuganfang</label>
@@ -105,7 +112,13 @@
     <section id="screen4" class="screen hidden">
       <h2>Spielende</h2>
       <div class="result" id="winner-text">–</div>
+    
       <div class="row">
+        <div id="summary" class="card scroll" style="min-width:300px; flex:1"></div>
+      </div>
+    
+      <div class="row">
+        <button id="rematch-btn" class="primary">Revanche</button>
         <button onclick="location.reload()">Neu laden</button>
       </div>
     </section>
