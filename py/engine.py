@@ -456,7 +456,7 @@ def is_possible(keys: set[Keyword], last: int, n_used: int, zweite_chance: bool,
                 if n_used >= key.value + zweite_chance:
                     return False
             case 1:
-                if (last - ((not is_my_turn) * (2 * (not is_first_slot) - 1))) // 2 < key.value:
+                if (last - ((not is_my_turn) * (2 * (is_first_slot) - 1))) // 2 < key.value:
                     return False
                 # last = Differenz in ZÜGEN  seit letzter Nutzung.
                 # Eigener Zug:     last//2 <= key.value
@@ -500,7 +500,6 @@ async def attacke_einsetzen(lobby: Lobby, owner: Spieler | Monster, attacke: Att
             is_main = is_my_turn and ((time % 5) == 2)
             keys = set(attacke.attacke.keywords) | set(attacke.x_keywords)
             eingesetzt = owner.stats.atk_eingesetzt
-            await lobby.clients[id].client.message(str((not eingesetzt[0],time // 5 - attacke.last_used // 5,(time // 5 - attacke.last_used // 5 - ((not is_my_turn) * (2 * (eingesetzt[0]) - 1))) // 2)))
             if is_possible(keys, time // 5 - attacke.last_used // 5, attacke.n_used,
                            any(ab.attacke is Zweite_Chance for ab in owner.stats.attacken),
                            (not lobby.reaktion and is_main), is_my_turn, not eingesetzt[0], not (eingesetzt == (True, True))):
