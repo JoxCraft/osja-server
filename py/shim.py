@@ -9,6 +9,14 @@ def _ensure_tmp(lobby: eng.Lobby):
     if not hasattr(lobby, "_tmp"):
         lobby._tmp = {}
 
+# --- Extra-Lobby-Flags für Draw-Angebot (ohne engine.py anfassen) ---
+def _ensure_draw_field(lobby: eng.Lobby):
+    if not hasattr(lobby, "_draw_offer"):  # None | 0 | 1
+        lobby._draw_offer = None
+
+def _opponent_id(pid: int) -> int:
+    return (pid - 1) % 2
+
 def _player_id_by_name(lobby: eng.Lobby, player_name: str) -> int:
     for c in lobby.clients:
         if c.spieler.name == player_name:
@@ -138,6 +146,95 @@ def _client_by_name(lobby:eng.Lobby, name:str) -> eng.Client:
         if c.spieler.name == name:
             return c
     raise RuntimeError(f"player not found: {name!r}. In lobby: {[cl.spieler.name for cl in lobby.clients]}")
+
+async def _announce_win(lobby: eng.Lobby, winner_name: str | None):
+    lobby.phase = 3
+    lobby.winner = "Tie" if winner_name is None else winner_name
+    # Engine ruft bei natürlichem Sieg client.win(); hier spiegeln wir das gleich:
+    for cl in lobby.clients:
+        await cl.client.win()
+
+def _player_and_pid(lobby: eng.Lobby, player_name: str) -> tuple[eng.Client, int]:
+    c = _client_by_name(lobby, player_name)
+    return c, c.spieler.spieler_id
+
+async def ui_resign(lobby_code: str, player_name: str):
+    lobby = get_lobby(lobby_code)
+    c, pid = _player_and_pid(lobby, player_name)
+    opp = lobby.clients[_opponent_id(pid)].spieler
+    await _announce_win(lobby, opp.name)
+    return True
+
+async def ui_draw_toggle(lobby_code: str, player_name: str):
+    lobby = get_lobby(lobby_code)
+    _ensure_draw_field(lobby)
+    _, pid = _player_and_pid(lobby, player_name)
+
+    # Noch kein Angebot -> meins setzen
+    if lobby._draw_offer is None:
+        lobby._draw_offer = pid
+        # kleine Info an beide Seiten (optional)
+        try:
+            await lobby.clients[pid].client.message("Du bietest ein Unentschieden an.")
+            await lobby.clients[_opponent_id(pid)].client.message(f"{player_name} bietet ein Unentschieden an.")
+        except Exception:
+            pass
+        return {"status": "offered", "by": player_name}
+
+    # Ich habe angeboten -> zurückziehen
+    if lobby._draw_offer == pid:
+        lobby._draw_offer = None
+        try:
+            await lobby.clients[pid].client.message("Du hast dein Unentschieden-Angebot zurückgezogen.")
+        except Exception:
+            pass
+        return {"status": "withdrawn"}
+
+    # Gegner hat angeboten -> annehmen => Tie
+    if lobby._draw_offer == _opponent_id(pid):
+        lobby._draw_offer = None
+        await _announce_win(lobby, None)  # Tie
+        return {"status": "accepted"}
+
+    return {"status": "noop"}
+    
+async def ui_rematch(lobby_code: str):
+    old = get_lobby(lobby_code)
+    old_clients = list(old.clients)
+
+    # Neue Lobby
+    new_lobby = eng.Lobby(lobby_code, clients=[])
+
+    # Frische Spieler + frische PyClients (mit altem JS-Client)
+    for old_cl in old_clients:
+        sp = eng.Spieler(
+            spieler_id=old_cl.spieler.spieler_id,
+            name=old_cl.spieler.name,
+            stats=eng.Stats()
+        )
+        # WICHTIG: alten JS-Client aus PyClient ziehen und neu wrappen
+        old_py = old_cl.client                   # ist PyClient
+        new_py = PyClient(new_lobby, sp.spieler_id, old_py.js)
+        new_cl = eng.Client(client=new_py, spieler=sp)
+        new_lobby.clients.append(new_cl)
+
+    # Alte Lobby in-place ersetzen
+    for i, lb in enumerate(eng.lobbies):
+        if lb is old:
+            eng.lobbies[i] = new_lobby
+            break
+
+    # Reset/Init
+    global _paid
+    _paid.clear()
+    _ensure_tmp(new_lobby)
+    _ensure_draw_field(new_lobby)
+    new_lobby.winner = None
+    new_lobby.phase = 0  # führt im Snapshot zu screen=1 (Attackenwahl)
+
+    return True
+
+
 
 # ---------- Pools ----------
 def _attack_type_counts():
@@ -355,12 +452,22 @@ def _ser_member(name: str, st: eng.Stats, is_player: bool):
         "attacks": _ser_attacks_full(st),
     }
 
+def _ser_player_extra(sp: eng.Spieler):
+    return {
+        "attacks_used": int(sp.stats.n_attacken),
+        "self_damage": int(sp.stats.n_selbstschaden),
+        "monsters_alive": len(sp.monster),
+        "monsters_gy": len(sp.gy),
+    }
+
 def _ser_player(sp: eng.Spieler):
     data = _ser_member(sp.name, sp.stats, True)
     data["monsters"] = [_ser_member(f"Monster {i+1}", m.stats, False) for i, m in enumerate(sp.monster)]
     data["known"] = [_ser_attackebesitz_full(ab) for ab in sp.atk_known]   # 1:1 known
     data["flags"] = { "start": bool(sp.stop_start), "end": bool(sp.stop_end), "react": bool(sp.stop_react) }
+    data["extra"] = _ser_player_extra(sp)
     return data
+
 
 def _char_label(lobby: eng.Lobby, ch: eng.Spieler | eng.Monster | None) -> str:
     if ch is None:
@@ -397,6 +504,7 @@ def _stack_target_label(lobby: eng.Lobby, e: eng.AttackeEingesetzt):
     if e.t_2 is not None:
         labels.append(f"Ziel 2: {_char_label(lobby, e.t_2)}")
     return labels
+
 
 def lobby_snapshot(lobby: eng.Lobby | str):
     # Falls nur der Code übergeben wird, die echte Lobby holen
@@ -452,6 +560,18 @@ def lobby_snapshot(lobby: eng.Lobby | str):
         sp = lobby.clients[i].spieler
         state["players"].append(_ser_player(sp))
 
+    # Winner & Draw-OFFER  <<< außerhalb der Schleife!
+    state["winner"] = getattr(lobby, "winner", None)
+    _ensure_draw_field(lobby)
+    if lobby._draw_offer is None:
+        state["draw_offer_by"] = None
+    else:
+        try:
+            state["draw_offer_by"] = lobby.clients[lobby._draw_offer].spieler.name
+        except Exception:
+            state["draw_offer_by"] = None
+
     return state
+
 
 
