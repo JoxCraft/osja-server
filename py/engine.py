@@ -440,7 +440,7 @@ async def leben_zahlen(lobby: Lobby, c1: Client, pay1: int, c2: Client, pay2: in
 
 def get_new_zauberkünstück_teil(attacke:AttackeBesitz):
     s = get_rnd_secrt()
-    attacke_new = replace(attacke.attacke,text=s.name)
+    attacke_new = replace(attacke.attacke,text=s.attacke.name)
     attacke.attacke = attacke_new
 
 async def passen(lobby: Lobby):
