@@ -5,8 +5,8 @@ import copy
 
 @dataclass
 class Geheimnis:
-    name: str
-    text: str
+    attacke:Attacke
+    trigger:int=0 #0, before attack 1,after attack 2,no dmg eot 3, begin of turn 4 else
 
 
 @dataclass(frozen=True)
@@ -185,12 +185,12 @@ Schnell_Atk = Attacke(name="Schnell", text="Bevor dem Zugende: verleihe einer de
 Schneller = Attacke(name="Schneller",
                     text="Verleihe eine deiner Attacken in diesem Zug schnell und „Diese Attacke kann keinem Gegner "
                          "Schaden machen“",
-                    keywords=[Extra, Zweimalig, Schnell], type=0, targets=[True, True, 0, 0])
+                    keywords=[Extra, Schnell], type=0, targets=[True, True, 0, 0])
 Schwertschlag = Attacke(name="Schwertschlag", text="100 Schaden", keywords=[], type=0, targets=[True, 0, 0, 0])
 Seelenschlag = Attacke(name="Seelenschlag", text="120 Schaden. Du erleidest 50 Schaden", keywords=[], type=0,
                        targets=[True, 0, 0, 0])
 Sichere_und_geheime_Mission = Attacke(name="Sichere und geheime Mission",
-                                      text="60 Schaden. Nicht konterbar. Schaden nicht veränderbar", keywords=[Schnell],
+                                      text="70 Schaden. Nicht konterbar. Schaden nicht veränderbar", keywords=[Schnell],
                                       type=0, targets=[True, 0, 0, 0])
 Sicherer_Schlag = Attacke(name="Sicherer Schlag", text="90 Schaden. Schaden nicht veränderbar", keywords=[], type=0,
                           targets=[True, 0, 0, 0])
@@ -214,7 +214,8 @@ Wand = Attacke(name="Wand", text="Beschwöre ein 0/50 Monster mit Spott", keywor
 Wut = Attacke(name="Wut", text="Deine nächste Attacke die Schaden macht, verursacht +20 Schaden",
               keywords=[Einmalig, Extra], type=0)
 Zauberkunststück = Attacke(name="Zauberkunststück (WIP)",
-                           text="Wähle eines von drei zufälligen Geheimnissen, der Nummern 1-7", keywords=[], type=0)
+                           text='Erhalte beim Wählen dieser Attacke drei Kopien der Attacke: "erhalte ein zufälliges '
+                                'Gehemnis der Nummern 1-7, du weißt im voraus welches du bekommst"', keywords=[], type=0)
 Zaubertrick = Attacke(name="Zaubertrick (WIP)", text="erhalte ein zufälliges Geheimnis", keywords=[], type=0)
 Zellteilung = Attacke(name="Zellteilung (WIP)",
                       text="Opfere eines deiner Monster. Beschwöre ein Monster mit gleichen Leben und Attacken wie "
@@ -239,7 +240,7 @@ Einen_Schritt_voraus = Attacke(name="Einen Schritt voraus",
                                keywords=[Zweimalig, Extra, Schnell], type=1, targets=[0, 0, True, 0])
 Gedankenkontrolle2 = Attacke(name="Gedankenkontrolle",
                              text='Dein Gegner setzt die Attacke ein: "Füge dir selbst 60 Schaden zu"', keywords=[],
-                             type=1)
+                             type=1, targets=[True,0,0,0])
 Geschwindigkeitstraining = Attacke(name="Geschwindigkeitstraining", text="Verleihe einer Attacke schnell", keywords=[],
                                    type=1, targets=[True, True, 0, 0])
 Grüne_Karte = Attacke(name="Grüne Karte", text="In diesem Spiel wurde eine gelbe Karte weniger ausgespielt",
@@ -273,6 +274,36 @@ entferne_Schnell_Schaden = Attacke(name='Event - Effekt von "Schneller" abgelauf
                                    type=2)
 entferne_Wut = Attacke(name="Event - entferne Wut", text="entferne 10 Wut", type=2)
 
+gehemnis1 = Attacke(name="Geheimnis - Bevor ein Gegner dir Schaden macht, verursache ihm 100 Schaden",
+                    text="Bevor ein Gegner dir Schaden macht, verursache ihm 100 Schaden",type=2)
+
+gehemnis2 = Attacke(name="Geheimnis - Wenn du im Zug eines Gegners keinen Schaden bekommst, verursache 100 Schaden",
+                    text="Wenn du im Zug eines Gegners keinen Schaden bekommst, verursache 100 Schaden",type=2)
+
+geheimnis3 = Attacke(name="Geheimnis - Nachdem ein Gegner dir Schaden macht, heile 100 Leben",
+                     text="Nachdem ein Gegner dir Schaden macht, heile 100 Leben",type=2)
+
+geheimnis4 = Attacke(name="Geheimnis - Wenn du im Zug eines Gegners keinen Schaden bekommst, heile 100 Leben",
+                     text="Wenn du im Zug eines Gegners keinen Schaden bekommst, heile 100Leben",type=2)
+
+geheimnis5 = Attacke(name="Geheimnis - Nachdem du Schaden bekommst, beschwöre ein 50/50 Monster",
+                     text="Nachdem du Schaden bekommst, beschwöre ein 50/50 Monster",type=2)
+
+geheimnis6 = Attacke(name="Geheimnis - Wenn du im Zug des Gegners keinen Schaden bekommst, beschwöre ein 50/50 Monster",
+                     text="Wenn du im Zug des Gegners keinen Schaden bekommst, beschwöre ein 50/50 Monster",type=2)
+
+gehemnis7 = Attacke(name="Geheimnis - Wenn du Schaden bekommen würdest, verhindere 150 des Schadens",
+                    text="Wenn du Schaden bekommen würdest, verhindere 150 des Schadens",type=2)
+
+geheimnis8 = Attacke(name="Geheimnis - Wähle zu Beginn deines Zuges erhalte zwei zufällige Geheimnissen",
+                     text="Wähle zu Beginn deines Zuges erhalte zwei zufällige Geheimnissen",type=2)
+
+geheimnis9 = Attacke(name="Geheimnis - Wenn ein Gegner dir tödlichen Schaden machen würde, verhindere jenen Schaden",
+                     text="Wenn ein Gegner dir tödlichen Schaden machen würde, verhindere jenen Schade",type=2)
+
+geheimnis10 = Attacke(name="Geheimnis - Wenn ein Gegner dir Schaden verursachen würde bekommt er stattdessen den Schade"
+                           "n", text="Wenn ein Gegner dir Schaden verursachen würde bekommt er stattdessen den Schaden",
+                      type=2)
 
 @dataclass
 class Client:
@@ -488,6 +519,13 @@ def is_my_turn(lobby: Lobby, character: Spieler | Monster):
     return (time // 5) % 2 != (id == start)
 
 
+async def dmg(lobby:Lobby,target:Spieler|Monster,damage:int,owner:Spieler|Monster):
+    target.stats.leben -= damage
+    if is_my_turn(lobby, target):
+        target.stats.n_selbstschaden += damage
+
+
+
 async def attacke_einsetzen(lobby: Lobby, owner: Spieler | Monster, attacke: AttackeBesitz,
                             t_1: Spieler | Monster | None = None, t_atk: AttackeBesitz | None = None,
                             t_stk: int | None = None, t_2: Spieler | Monster | None = None):
@@ -596,28 +634,21 @@ def real_damage_calc(lobby: Lobby, damage: int, attacke: AttackeEingesetzt, targ
                     sum(ab.attacke is Metallschild for ab in target.stats.attacken) * 10) - (wiesen * 20)) * anzahl
 
 
-def damage(lobby: Lobby, damage: int, attacke: AttackeEingesetzt, anzahl: int = 1):
+async def damage(lobby: Lobby, damage: int, attacke: AttackeEingesetzt, anzahl: int = 1):
     target = attacke.t_1
     target = other_spott(lobby, target)
     damage = real_damage_calc(lobby, damage, attacke, target, anzahl)
-    target.stats.leben -= damage
-    if is_my_turn(lobby, target):
-        target.stats.n_selbstschaden += damage
+    await dmg(lobby,target,damage,attacke.owner)
 
 
-def all_damage(lobby: Lobby, damage: int, attacke: AttackeEingesetzt):
-    target = attacke.t_1
+
+async def all_damage(lobby: Lobby, damage: int, attacke: AttackeEingesetzt):
+    target = lobby.clients[attacke.owner.spieler_id-1].spieler
     damage = real_damage_calc(lobby, damage, attacke, target)
-    if is_my_turn(lobby, target):
-        target.stats.n_selbstschaden += damage
-        target.stats.leben -= damage
-        for mon in target.monster:
-            mon.stats.n_selbstschaden += damage
-            mon.stats.leben -= damage
-    else:
-        target.stats.leben -= damage
-        for mon in target.monster:
-            mon.stats.leben -= damage
+    await dmg(lobby,target,damage,attacke.owner)
+    for mon in target.monster:
+        damage = real_damage_calc(lobby, damage, attacke, mon)
+        await dmg(lobby,mon,damage,attacke.owner)
 
 
 def add_wut(target: Spieler | Monster, mod: int):
@@ -777,6 +808,9 @@ async def attacken_ausführen(lobby: Lobby):
                                 ev = Event(time=(lobby.turntime // 10) * 10 + 10,
                                            event=AttackeEingesetzt(attacke=dupe.attacke, owner=atk.owner, t_1=t_1,
                                                                    t_atk=t_atk, t_stk=t_stk, t_2=t_2))
+                                opp = lobby.clients[atk.owner.spieler_id - 1].spieler
+                                if atk.t_atk not in opp.atk_known:
+                                    opp.atk_known.append(t_atk)
                                 lobby.events.append(ev)
                                 lobby.events.append(copy.deepcopy(ev))
                         case "Alles wird gut!":
@@ -787,15 +821,15 @@ async def attacken_ausführen(lobby: Lobby):
                                 konter(lobby, atk.t_stk)
                         case "Feuerkobold":
                             monster(lobby, atk.owner, 0, 50)
-                            damage(lobby, 50, atk)
+                            await damage(lobby, 50, atk)
                         case "Feurige Waffen":
                             atk.owner.stats.wut += 10
                             lobby.events.append(
                                 Event((lobby.turntime // 5) * 5 + 5, AttackeEingesetzt(entferne_Wut, atk.owner)))
                         case "Finale":
-                            damage(lobby, 150, atk)
+                            await damage(lobby, 150, atk)
                         case "Finales Ritual":
-                            damage(lobby, atk.owner.stats.n_selbstschaden, atk)
+                            await damage(lobby, atk.owner.stats.n_selbstschaden, atk)
                         case "Freund der Tiere":
                             monster(lobby, atk.owner, 50, 50)
                         case "Gedankenkontrolle":
@@ -803,17 +837,17 @@ async def attacken_ausführen(lobby: Lobby):
                                 verraten(lobby, atk.owner)
                                 t_1, t_atk, _, _ = await ask_targets(client=lobby.clients[atk.owner.spieler_id].client,
                                                                      t_atk=True, t_1=True)
-                                #Todo
                             else:
-                                damage(lobby, 60, atk)
+                                atk.owner = atk.t_1
+                                await damage(lobby, 60, atk)
                         case "Geheime Mission":
-                            damage(lobby, 90, atk)
+                            await damage(lobby, 90, atk)
                         case "Gelbe Karte":
                             lobby.n_gelbe_Karte += 1
                             if lobby.n_gelbe_Karte != 2:
-                                damage(lobby, 100, atk)
+                                await damage(lobby, 100, atk)
                             else:
-                                damage(lobby, 250, atk)
+                                await damage(lobby, 250, atk)
                         case "Geschenk des Lebens":
                             for mon in lobby.clients[atk.owner.spieler_id].spieler.monster:
                                 erhalte_leben(mon, 50)
@@ -836,7 +870,7 @@ async def attacken_ausführen(lobby: Lobby):
                         case "Konter":
                             konter(lobby, atk.t_stk)
                         case "Langsam, aber sicher":
-                            damage(lobby, 10 * atk.owner.stats.n_attacken, atk)
+                            await damage(lobby, 10 * atk.owner.stats.n_attacken, atk)
                         case "Lebender Baum":
                             monster(lobby, atk.owner, 0, 150)
                         case "Lebender Schild":
@@ -857,19 +891,19 @@ async def attacken_ausführen(lobby: Lobby):
                         case "Letzte Chance":
                             pass
                         case "Letzter Wille":
-                            damage(lobby, 20, atk, 5)
+                            await damage(lobby, 20, atk, 5)
                         case "Meister der Magie":
-                            damage(lobby, len(atk.owner.stats.ausgelöst) * 30, atk)
+                            await damage(lobby, len(atk.owner.stats.ausgelöst) * 30, atk)
                         case "Messerstich":
-                            damage(lobby, 20, atk)
+                            await damage(lobby, 20, atk)
                         case "Messerwürfe":
-                            damage(lobby, 20, atk, 4)
+                            await damage(lobby, 20, atk, 4)
                         case "Opfer":
                             pass
                         case "Prestige":
                             pass
                         case "Schild und Schwert":
-                            damage(lobby, 50, atk)
+                            await damage(lobby, 50, atk)
                             block(lobby, atk.t_stk, 50)
                         case "Schnell":
                             end_time = ((lobby.turntime + 1) // 5) * 5 + 4
@@ -886,23 +920,25 @@ async def attacken_ausführen(lobby: Lobby):
                                 attacke=entferne_Schnell_Schaden, owner=atk.owner, t_atk=atk.t_atk)))
                         case "Schwertschlag":
                             if atk.attacke.type == 0:
-                                damage(lobby, 100, atk)
+                                await damage(lobby, 100, atk)
                             else:
-                                damage(lobby, 80, atk)
+                                await damage(lobby, 80, atk)
                         case "Seelenschlag":
-                            damage(lobby, 120, atk)
                             old_target = atk.t_1
                             atk.t_1 = atk.owner
-                            damage(lobby, 50, atk)
+                            await damage(lobby, 50, atk)
                             atk.t_1 = old_target
+                            await damage(lobby, 120, atk)
                         case "Sichere und geheime Mission":
-                            atk.t_1.stats.leben -= 60
+                            target = other_spott(lobby, atk.t_1)
+                            await dmg(lobby,target,70,atk.owner)
                         case "Sicherer Schlag":
-                            atk.t_1.stats.leben -= 90
+                            target = other_spott(lobby,atk.t_1)
+                            await dmg(lobby,target,90,atk.owner)
                         case "Spiegelschild":
                             pass
                         case "Verrat":
-                            damage(lobby, 80, atk)
+                            await damage(lobby, 80, atk)
                         case "Vorbereitung":
                             dmg_mod(atk.owner, 30)
                         case "Wachsames Auge":
@@ -959,14 +995,14 @@ async def attacken_ausführen(lobby: Lobby):
                             lobby.atkmod -= 30
                             lobby.healmod -= 30
                         case "Sandsturm":
-                            all_damage(lobby, 50, atk)
+                            await all_damage(lobby, 50, atk)
                         case "Schuss und Schlag":
                             pass
                         case "Wieder normal":
                             if Passiv in atk.t_atk.x_keywords or Passiv in atk.t_atk.attacke.keywords:
                                 attacke_zerstören(atk.t_1, atk.t_atk)
                         case "Schaden":
-                            damage(lobby, int(atk.attacke.text.split(" ")[0]), atk)
+                            await damage(lobby, int(atk.attacke.text.split(" ")[0]), atk)
                         case "Event - erhalte Schnell":
                             add_key(Schnell, atk.t_atk)
                         case "Event - entferne Schnell":
@@ -976,9 +1012,9 @@ async def attacken_ausführen(lobby: Lobby):
                             remove_key(kein_Schaden, atk.t_atk)
                         case "Event - entferne Wut":
                             add_wut(atk.owner, -10)
-                    await check_winner(lobby)
                     check_monster(lobby)
+                    await check_winner(lobby)
                 if len(stk_atk)>counter:
                     counter += 1
                 else:
-                    break
+                    break 
