@@ -303,7 +303,7 @@ geheimnis6 = Attacke(name="Geheimnis - Wenn du im Zug des Gegners keinen Schaden
 geheimnis7 = Attacke(name="Geheimnis - Wenn du Schaden bekommen würdest, verhindere 150 des Schadens",
                     text="Wenn du Schaden bekommen würdest, verhindere 150 des Schadens",type=2)
 
-geheimnis8 = Attacke(name="Geheimnis - Wähle zu Beginn deines Zuges erhalte zwei zufällige Geheimnissen",
+geheimnis8 = Attacke(name="Geheimnis - Erhalte zu beginn deines Zuges zwei zufällige Geheimnissen",
                      text="Wähle zu Beginn deines Zuges erhalte zwei zufällige Geheimnissen",type=2)
 
 geheimnis9 = Attacke(name="Geheimnis - Wenn ein Gegner dir tödlichen Schaden machen würde, verhindere jenen Schaden",
@@ -438,8 +438,8 @@ async def leben_zahlen(lobby: Lobby, c1: Client, pay1: int, c2: Client, pay2: in
         await passen(lobby)
 
 
-def get_new_zauberkünstück_teil(attacke:AttackeBesitz):
-    s = get_rnd_secrt()
+def get_new_zauberkunstück_teil(attacke:AttackeBesitz):
+    s = get_rnd_secrt(7)
     attacke_new = replace(attacke.attacke,text=s.attacke.name)
     attacke.attacke = attacke_new
 
@@ -473,11 +473,11 @@ async def passen(lobby: Lobby):
                         #reset zauberkünstück teil
                         for attacke in pl.stats.attacken:
                             if attacke.attacke.name == Zauberkunstück_Teil.name:
-                                get_new_zauberkünstück_teil(attacke)
+                                get_new_zauberkunstück_teil(attacke)
                         for mon in pl.monster:
                             for attacke in mon.stats.attacken:
                                 if attacke.attacke.name == Zauberkunstück_Teil.name:
-                                    get_new_zauberkünstück_teil(attacke)
+                                    get_new_zauberkunstück_teil(attacke)
                         #trigger bot secrets
                         for geheimnis in pl.stats.geheimnisse:
                             if geheimnis.trigger == 3:
@@ -520,11 +520,11 @@ async def passen(lobby: Lobby):
                         # reset zauberkünstück teil
                         for attacke in pl.stats.attacken:
                             if attacke.attacke.name == Zauberkunstück_Teil.name:
-                                get_new_zauberkünstück_teil(attacke)
+                                get_new_zauberkunstück_teil(attacke)
                         for mon in pl.monster:
                             for attacke in mon.stats.attacken:
                                 if attacke.attacke.name == Zauberkunstück_Teil.name:
-                                    get_new_zauberkünstück_teil(attacke)
+                                    get_new_zauberkunstück_teil(attacke)
                         # trigger bot secrets
                         for geheimnis in pl.stats.geheimnisse:
                             if geheimnis.trigger == 3:
@@ -685,8 +685,8 @@ async def dmg(lobby:Lobby, target:Spieler|Monster, damg:int, owner: Spieler | Mo
         for geheimnis in after_dmg:
             await execute_geheimnis(lobby,geheimnis,target)
 
-def get_rnd_secrt():
-    return random.choice(all_geheimnisse)
+def get_rnd_secrt(end:int=len(all_geheimnisse)):
+    return random.choice(all_geheimnisse[:end])
 
 async def attacke_einsetzen(lobby: Lobby, owner: Spieler | Monster, attacke: AttackeBesitz,
                             t_1: Spieler | Monster | None = None, t_atk: AttackeBesitz | None = None,
