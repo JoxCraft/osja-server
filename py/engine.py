@@ -813,7 +813,7 @@ async def all_damage(lobby: Lobby, damage: int, attacke: AttackeEingesetzt):
         await dmg(lobby,mon,damage,attacke.owner)
 
 async def add_secret_to_secrets(lobby:Lobby,target:Spieler|Monster,secret:Geheimnis):
-    await lobby.clients[target.spieler_id].client.message("Neu: " + secret.name)
+    await lobby.clients[target.spieler_id].client.message("Neu: " + secret.attacke.name)
     target.stats.geheimnisse.append(secret)
 
 
