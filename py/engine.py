@@ -138,7 +138,7 @@ Geschenk_des_Lebens = Attacke(name="Geschenk des Lebens", text="Verleihe allen f
                               keywords=[], type=0)
 Gleichheit = Attacke(name="Gleichheit", text="Gleiche die Leben deines Gegners deinen Leben an",
                      keywords=[nicht_Schnell], type=0)
-Hartes_Training = Attacke(name="Hartes Training", text="Erhalte 10 Wut", keywords=[], type=0)
+Hartes_Training = Attacke(name="Hartes Training", text="Erhalte 15 Wut", keywords=[], type=0)
 Heilung = Attacke(name="Heilung", text="Heile 100 Leben", keywords=[Super3], type=0, targets=[True, 0, 0, 0])
 Immer_vorbereitet = Attacke(name="Immer vorbereitet",
                             text="Wähle vor Spielbeginn 3 Rangeleien und füge sie zu deinen Attacken hinzu",
@@ -204,7 +204,7 @@ Verführerisches_Angebot = Attacke(name="Verführerisches Angebot",
 Verrat = Attacke(name="Verrat", text="80 Schaden", keywords=[Schnell], type=0, targets=[True, 0, 0, 0])
 Vorbereitung = Attacke(name="Vorbereitung", text="Deine nächste Attacke die Schadenmacht, verursacht +30 Schaden",
                        keywords=[], type=0)
-Wachsames_Auge = Attacke(name="Wachsames Auge",
+Wachsames_Auge = Attacke(name="Wachsames Auge (WIP)",
                          text="Dein Gegner verrät dir seine Attacken, wähle eine von ihnen aus. Er kann sie für 2 "
                               "Züge nicht einsetzen",
                          keywords=[Einmalig, Extra, Schnell], type=0)
@@ -823,7 +823,7 @@ async def attacken_ausführen(lobby: Lobby):
                             lobby.clients[atk.owner.spieler_id - 1].spieler.stats.maxLeben = lobby.clients[
                                 atk.owner.spieler_id].spieler.stats.maxLeben
                         case "Hartes Training":
-                            add_wut(atk.owner, 10)
+                            add_wut(atk.owner, 15)
                         case "Heilung":
                             if atk.attacke.type == 0:
                                 heilen(lobby, atk, 100)
