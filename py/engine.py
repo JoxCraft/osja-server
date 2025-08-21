@@ -225,18 +225,17 @@ Zauberkunststück = Attacke(name="Zauberkunststück",
                                 'Gehemnis der Nummern 1-7, du weißt im voraus welches du bekommst"', keywords=[], type=0)
 Zaubertrick = Attacke(name="Zaubertrick", text="erhalte ein zufälliges Geheimnis", keywords=[], type=0)
 Zellteilung = Attacke(name="Zellteilung (WIP)",
-                      text="Opfere eines deiner Monster. Beschwöre ein Monster mit gleichen Leben und Attacken wie "
-                           "das geopferte Monster am Ende deines Übernächsten Zuges zweimal",
+                      text="Opfere eines deiner Monster. Beschwöre das geopferte Monster am Ende deines Übernächsten "
+                           "Zuges zweimal",
                       keywords=[], type=0, targets=[True, 0, 0, 0])
 Zwei_Wünsche = Attacke(name="Zwei Wünsche", text="Kontere eine Attacke", keywords=[Zweimalig, Schnell], type=0,
                        targets=[0, 0, True, 0])
 Zweite_Chance = Attacke(name="Zweite Chance", text="Deine X-maligen Attacken sind (X+1)-malig", keywords=[Passiv],
                         type=0)
-Zyklus_des_Lebens = Attacke(name="Zyklus des Lebens (WIP)",
-                            text="Jedes Mal, wenn ein Monster ohne eine Geboren-Marke stirbt, wähle genau eine der "
-                                 "beiden Optionen aus: 1. Notiere dir die Leben und Attacken des Monsters 2. Belebe "
-                                 "ein von dir notiertes Monster mit anderen Leben als das gestorbene Monster mit "
-                                 "einer Geboren-Marke wider. Streiche es von deinen notierten Monstern",
+Zyklus_des_Lebens = Attacke(name="Zyklus des Lebens",
+                            text="Jedes Mal, wenn eines deiner Monster ohne Spott stirbt, während Monster in deinem "
+                                 "Friedhof sind: belebe eines deiner Monster ohne Spott wider, anstatt das sterbende "
+                                 "Monster in den Friedhof zu legen",
                             keywords=[Passiv], type=0)
 Über_dem_Horizont = Attacke(name="Über dem Horizont", text="erhalte 120 Leben", keywords=[Einmalig, Schnell], type=0,
                             targets=[True, 0, 0, 0])
@@ -256,8 +255,8 @@ Grüne_Wiese = Attacke(name="Grüne Wiese",
                       text="Wenn Charaktere eine Attacke nicht in ihrem eigenen Zug ausführen, verursachen jene "
                            "Attacken 20 Schaden weniger",
                       keywords=[Passiv], type=1)
-Gutes_Auge = Attacke(name="Gutes Auge (WIP)", text="Übernimm die Kontrolle über zwei zufällige Geheimnisse",
-                     keywords=[Einmalig], type=1)
+Gutes_Auge = Attacke(name="Gutes Auge", text="Übernimm die Kontrolle über zwei zufällige Geheimnisse",
+                     keywords=[Einmalig], type=1, targets=[True,0,0,0])
 Heilung2 = Attacke(name="Heilung", text="Heile 80 Leben", keywords=[Super3], type=1, targets=[True, 0, 0, 0])
 Neu_geboren = Attacke(name="Neu geboren", text="Setze die Leben eines Gegners auf 500", keywords=[Extra],
                       type=1)
@@ -635,8 +634,7 @@ async def execute_geheimnis(lobby:Lobby, geheimnis:Geheimnis,owner:Spieler|Monst
 
 async def cst_rnd_secrt(lobby:Lobby,target:Spieler|Monster):
     s = get_rnd_secrt()
-    await lobby.clients[target.spieler_id].client.message("Neu: " + s.name)
-    target.stats.geheimnisse.append(s)
+    await add_secret_to_secrets(lobby,target,s)
 
 
 async def dmg(lobby:Lobby, target:Spieler|Monster, damg:int, owner: Spieler | Monster, veränderbar:bool=True):
@@ -814,6 +812,10 @@ async def all_damage(lobby: Lobby, damage: int, attacke: AttackeEingesetzt):
         damage = real_damage_calc(lobby, damage, attacke, mon)
         await dmg(lobby,mon,damage,attacke.owner)
 
+async def add_secret_to_secrets(lobby:Lobby,target:Spieler|Monster,secret:Geheimnis):
+    await lobby.clients[target.spieler_id].client.message("Neu: " + secret.name)
+    target.stats.geheimnisse.append(secret)
+
 
 def add_wut(target: Spieler | Monster, mod: int):
     target.stats.wut += mod
@@ -841,7 +843,14 @@ def check_monster(lobby: Lobby):
             if mon.stats.leben > 0:
                 alive.append(mon)
             else:
-                client.spieler.gy.append(mon)
+                gy_ok = True
+                if not mon.stats.spott:
+                    if any(ab.attacke.name is Zyklus_des_Lebens.name for ab in client.spieler.stats.attacken):
+                        if len(client.spieler.gy) > 0:
+                            gy_ok = False
+                            resurrect(lobby,client.spieler,False)
+                if gy_ok:
+                    client.spieler.gy.append(mon)
         client.spieler.monster = alive
 
 
@@ -885,12 +894,12 @@ def monster(lobby: Lobby, owner: Spieler | Monster, angriff: int, leben: int, sp
                 spieler_id=owner.spieler_id))
 
 
-def resurrect(lobby: Lobby, target: Spieler | Monster):
+def resurrect(lobby: Lobby, target: Spieler | Monster,spott_allowed:bool=True):
     sp = lobby.clients[target.spieler_id].spieler
     if sp.gy:
         mon = random.choice(sp.gy)
         mon.stats = Stats(leben=mon.stats.maxLeben, maxLeben=mon.stats.maxLeben, attacken=mon.stats.attacken,
-                          spott=mon.stats.spott, atk_eingesetzt=(True, False))
+                          spott=mon.stats.spott and spott_allowed, atk_eingesetzt=(True, False))
         sp.monster.append(mon)
         sp.gy.remove(mon)
 
@@ -1139,16 +1148,13 @@ async def attacken_ausführen(lobby: Lobby):
                         case "Zauberkunststück - Teil":
                             for scrt in all_geheimnisse:
                                 if scrt.attacke.name == atk.attacke.text:
-                                    atk.owner.stats.geheimnisse.append(scrt)
-                                    await lobby.clients[atk.owner.spieler_id].client.message("Neu: " + scrt.attacke.name)
+                                    await add_secret_to_secrets(lobby,atk.owner,scrt)
                         case "Zaubertrick":
                             await cst_rnd_secrt(lobby,atk.owner)
                         case "Zellteilung":
                             pass
                         case "Zwei Wünsche":
                             konter(lobby, atk.t_stk)
-                        case "Zyklus des Lebens":
-                            pass
                         case "Über dem Horizont":
                             erhalte_leben(atk.t_1, 120)
                         case "Doppelter Spott":
@@ -1165,7 +1171,12 @@ async def attacken_ausführen(lobby: Lobby):
                         case "Grüne Karte":
                             lobby.n_gelbe_Karte = max(0, lobby.n_gelbe_Karte - 1)
                         case "Gutes Auge":
-                            pass
+                            for _ in range(2):
+                                l = atk.t_1.stats.geheimnisse
+                                if l:
+                                    g = random.choice(l)
+                                    await add_secret_to_secrets(lobby,atk.owner,g)
+                                    l.remove(g)
                         case "Neu geboren":
                             lobby.clients[atk.owner.spieler_id - 1].spieler.stats.leben = 500
                             lobby.clients[atk.owner.spieler_id - 1].spieler.stats.maxLeben = 500
