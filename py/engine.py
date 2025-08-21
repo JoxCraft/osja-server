@@ -318,11 +318,11 @@ all_geheimnisse = [Geheimnis(geheimnis1,0),Geheimnis(geheimnis2,2),Geheimnis(geh
                    Geheimnis(geheimnis5,1),Geheimnis(geheimnis6,2),Geheimnis(geheimnis7),Geheimnis(geheimnis8,3),
                    Geheimnis(geheimnis9),Geheimnis(geheimnis10)]
 
-Zauberkunstück_Teil1 = Attacke(name="Zauberkünstück - Teil 1/3",text="Wirke eines der Geheimnisse von 1-7, du weißt "
+Zauberkunstück_Teil1 = Attacke(name="Zauberkunstück - Teil 1/3",text="Wirke eines der Geheimnisse von 1-7, du weißt "
                                                                      "genau welches",type=2)
-Zauberkunstück_Teil2 = Attacke(name="Zauberkünstück - Teil 2/3",text="Wirke eines der Geheimnisse von 1-7, du weißt "
+Zauberkunstück_Teil2 = Attacke(name="Zauberkunstück - Teil 2/3",text="Wirke eines der Geheimnisse von 1-7, du weißt "
                                                                      "genau welches",type=2)
-Zauberkunstück_Teil3 = Attacke(name="Zauberkünstück - Teil 3/3",text="Wirke eines der Geheimnisse von 1-7, du weißt"
+Zauberkunstück_Teil3 = Attacke(name="Zauberkunstück - Teil 3/3",text="Wirke eines der Geheimnisse von 1-7, du weißt"
                                                                      " genau welches",type=2)
 
 @dataclass
@@ -351,7 +351,9 @@ class Lobby:
 lobbies = []
 
 
-async def ask_targets(client, t_1: bool = False, t_atk: bool = False, t_stk: bool = False, t_2: bool = False):
+async def ask_targets(lobby:Lobby,client, t_1: bool = False, t_atk: bool = False, t_stk: bool = False, t_2: bool = False):
+    old_prio = lobby.priority
+    lobby.priority = [index for index,element in enumerate(lobby.clients) if element.client == client][0]
     a, b, c, d = None, None, None, None
     if t_atk:
         a, b = await client.getatktarget()
@@ -361,13 +363,14 @@ async def ask_targets(client, t_1: bool = False, t_atk: bool = False, t_stk: boo
         c = await client.getstacktarget()
     if t_2:
         d = await client.getcharactertarget()
+    lobby.priority = old_prio
     return a, b, c, d
 
 
 async def attacke_gewählt(lobby: Lobby, owner: Spieler | Monster, attacke: AttackeBesitz):
     if lobby.phase == 2:
         l = attacke.attacke.targets
-        t_1, t_atk, t_stk, t_2 = await ask_targets(lobby.clients[owner.spieler_id].client, l[0], l[1], l[2], l[3])
+        t_1, t_atk, t_stk, t_2 = await ask_targets(lobby,lobby.clients[owner.spieler_id].client, l[0], l[1], l[2], l[3])
         await attacke_einsetzen(lobby, owner, attacke, t_1, t_atk, t_stk, t_2)
 
 
@@ -484,11 +487,11 @@ async def passen(lobby: Lobby):
                             mon.stats.took_dmg_this_turn = False
                         #reset zauberkünstück teil
                         for attacke in pl.stats.attacken:
-                            if attacke.attacke.name[:-2] == Zauberkunstück_Teil1.name[:-2]:
+                            if attacke.attacke.name[:-3] == Zauberkunstück_Teil1.name[:-3]:
                                 await get_new_zauberkunstück_teil(lobby,pl,attacke)
                         for mon in pl.monster:
                             for attacke in mon.stats.attacken:
-                                if attacke.attacke.name[:-2] == Zauberkunstück_Teil1.name[:-2]:
+                                if attacke.attacke.name[:-3] == Zauberkunstück_Teil1.name[:-3]:
                                     await get_new_zauberkunstück_teil(lobby,mon,attacke)
                         #trigger bot secrets
                         for geheimnis in pl.stats.geheimnisse:
@@ -531,11 +534,11 @@ async def passen(lobby: Lobby):
                             mon.stats.took_dmg_this_turn = False
                         # reset zauberkünstück teil
                         for attacke in pl.stats.attacken:
-                            if attacke.attacke.name[:-2] == Zauberkunstück_Teil1.name[:-2]:
+                            if attacke.attacke.name[:-3] == Zauberkunstück_Teil1.name[:-3]:
                                 await get_new_zauberkunstück_teil(lobby,pl,attacke)
                         for mon in pl.monster:
                             for attacke in mon.stats.attacken:
-                                if attacke.attacke.name[:-2] == Zauberkunstück_Teil1.name[:-2]:
+                                if attacke.attacke.name[:-3] == Zauberkunstück_Teil1.name[:-3]:
                                     await get_new_zauberkunstück_teil(lobby,mon,attacke)
                         # trigger bot secrets
                         for geheimnis in pl.stats.geheimnisse:
@@ -620,7 +623,7 @@ def is_my_turn(lobby: Lobby, character: Spieler | Monster):
 
 async def execute_geheimnis(lobby:Lobby, geheimnis:Geheimnis,owner:Spieler|Monster):
     g_t = geheimnis.attacke.targets
-    t_1,t_atk,t_stk,t_2 = await ask_targets(lobby.clients[owner.spieler_id-1].client,g_t[0],g_t[1],g_t[2],g_t[3])
+    t_1,t_atk,t_stk,t_2 = await ask_targets(lobby,lobby.clients[owner.spieler_id-1].client,g_t[0],g_t[1],g_t[2],g_t[3])
     atk = AttackeEingesetzt(attacke=geheimnis.attacke,owner=owner,ausgeführt=1,t_1=t_1
                                                   ,t_atk=t_atk,t_stk=t_stk,t_2=t_2)
     lobby.stack.attacken.append(atk)
@@ -992,7 +995,7 @@ async def attacken_ausführen(lobby: Lobby):
                                 dupe = replace(atk.t_atk, attacke=replace(atk.t_atk.attacke, type=2))
                                 attacke_zerstören(atk.t_1, atk.t_atk)
                                 l_ask = dupe.attacke.targets
-                                t_1, t_atk, t_stk, t_2 = await ask_targets(lobby.clients[atk.owner.spieler_id].client,
+                                t_1, t_atk, t_stk, t_2 = await ask_targets(lobby,lobby.clients[atk.owner.spieler_id].client,
                                                                            l_ask[0], l_ask[1], l_ask[2], l_ask[3])
                                 ev = Event(time=(lobby.turntime // 10) * 10 + 10,
                                            event=AttackeEingesetzt(attacke=dupe.attacke, owner=atk.owner, t_1=t_1,
@@ -1024,7 +1027,7 @@ async def attacken_ausführen(lobby: Lobby):
                         case "Gedankenkontrolle":
                             if atk.attacke.type == 0:
                                 verraten(lobby, atk.owner)
-                                t_1, t_atk, _, _ = await ask_targets(client=lobby.clients[atk.owner.spieler_id].client,
+                                t_1, t_atk, _, _ = await ask_targets(lobby,client=lobby.clients[atk.owner.spieler_id].client,
                                                                      t_atk=True, t_1=True)
                             else:
                                 atk.owner = atk.t_1
@@ -1157,7 +1160,7 @@ async def attacken_ausführen(lobby: Lobby):
                             monster(lobby, atk.owner, 0, 50, True)
                         case "Wut":
                             dmg_mod(atk.owner, 20)
-                        case "Zauberkunststück - Teil":
+                        case "Zauberkunstück - Teil 1/3"|"Zauberkunstück - Teil 2/3"|"Zauberkunstück - Teil 3/3":
                             await add_secret_to_secrets(lobby,atk.owner,all_geheimnisse[atk.attacke.extra_info])
                         case "Zaubertrick":
                             await cst_rnd_secrt(lobby,atk.owner)
