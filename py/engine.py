@@ -3,10 +3,11 @@ from dataclasses import dataclass, field, replace
 import random
 import copy
 
-@dataclass
+@dataclass(frozen=True)
 class Geheimnis:
     attacke:Attacke
-    trigger:int=0 #0, before attack 1,after attack 2,no dmg eot 3, begin of turn 4 else
+    trigger:int=4 #0, before attack 1,after attack 2,no dmg eot 3, begin of turn 4 else
+    mod:int=0
 
 
 @dataclass(frozen=True)
@@ -51,6 +52,9 @@ class Stats:
     geheimnisse: list[Geheimnis] = field(default_factory=list)
     ausgelöst: list[Geheimnis] = field(default_factory=list)
     attacken: list[AttackeBesitz] = field(default_factory=list)
+    took_dmg_this_turn: bool=False
+    letze_chancen: int=0
+    spiegelschilder: int=0
 
 
 @dataclass
@@ -58,6 +62,7 @@ class Monster:
     stats: Stats
     spieler_id: int
     is_monster: bool = True
+
 
 
 @dataclass
@@ -108,6 +113,8 @@ Schnell = Keyword(name="Schnell", text="kann auch an anderen Zeitpunkten als dei
                   category=4)
 nicht_Schnell = Keyword(name="nicht Schnell", text="kann immer nur in deiner Zugmitte eingesetzt werden", category=5)
 kein_Schaden = Keyword(name="kein Schaden", text="Attacke kann keinen Schaden machen", category=6)
+nicht_konterbar = Keyword(name="nicht konterbar", text="Attacke kann nicht gekontert werden", category=7)
+nicht_veränderbar = Keyword(name="nicht veränderbar", text="Schaden der Attacke kann nicht verändert werden", category=8)
 
 Alles_oder_nichts = Attacke(name="Alles oder nichts",
                             text="Wähle eine deiner nicht Xmalig- und nicht Superattacken und "
@@ -129,7 +136,7 @@ Gedankenkontrolle = Attacke(name="Gedankenkontrolle (WIP)",
                             text="Dein Gegner verrät dir seine Attacken. Wähle dann eine seiner Attacken, setze sie "
                                  "ein, so als würde sie der Gegner einsetzen",
                             keywords=[Dreimalig], type=0)
-Geheime_Mission = Attacke(name="Geheime Mission", text="90 Schaden. Nicht konterbar", keywords=[], type=0,
+Geheime_Mission = Attacke(name="Geheime Mission", text="90 Schaden", keywords=[nicht_konterbar], type=0,
                           targets=[True, 0, 0, 0])
 Gelbe_Karte = Attacke(name="Gelbe Karte",
                       text="100 Schaden. Ist dies die genau zweite ausgeführte gelbe Karte? Stattdessen 250 Schaden",
@@ -156,7 +163,7 @@ Lebenslehre = Attacke(name="Lebenslehre", text="Verleihe einem Monster eine dein
                       keywords=[], type=0, targets=[True, True, 0, True])
 Lehren = Attacke(name="Lehren", text="Verleihe einem Charakter die Attacke Schwertschalag", keywords=[], type=0,
                  targets=[True, 0, 0, 0])
-Letzte_Chance = Attacke(name="Letzte Chance (WIP)",
+Letzte_Chance = Attacke(name="Letzte Chance",
                         text="Wenn du das nächste Mal tödlichen Schaden bekommen würdest, negiere jenen Schaden und "
                              "heile dir 50 Leben",
                         keywords=[Einmalig], type=0)
@@ -168,10 +175,10 @@ Messerstich = Attacke(name="Messerstich", text="20 Schaden", keywords=[Extra], t
 Messerwürfe = Attacke(name="Messerwürfe", text="4 Mal 20 Schaden", keywords=[], type=0, targets=[True, 0, 0, 0])
 Metallschild = Attacke(name="Metallschild", text="Attacken des Gegners machen 10 Schaden weniger", keywords=[Passiv],
                        type=0)
-Opfer = Attacke(name="Opfer (WIP)",
+Opfer = Attacke(name="Opfer",
                 text="Vernichte ein freundliches Monster. Alle befreundeten Charaktere erhalten seine Leben",
                 keywords=[], type=0, targets=[True, 0, 0, 0])
-Prestige = Attacke(name="Prestige (WIP)", text="erhalte alle in diesen Spiel ausgelösten Geheimnisse", keywords=[Einmalig],
+Prestige = Attacke(name="Prestige", text="erhalte alle in diesen Spiel ausgelösten Geheimnisse", keywords=[Einmalig],
                    type=0)
 Schild_und_Schwert = Attacke(name="Schild und Schwert", text="Verhindere 50 Schaden. 50 Schaden", keywords=[Schnell],
                              type=0, targets=[True, 0, True, 0])
@@ -190,11 +197,11 @@ Schwertschlag = Attacke(name="Schwertschlag", text="100 Schaden", keywords=[], t
 Seelenschlag = Attacke(name="Seelenschlag", text="120 Schaden. Du erleidest 50 Schaden", keywords=[], type=0,
                        targets=[True, 0, 0, 0])
 Sichere_und_geheime_Mission = Attacke(name="Sichere und geheime Mission",
-                                      text="70 Schaden. Nicht konterbar. Schaden nicht veränderbar", keywords=[Schnell],
+                                      text="60 Schaden", keywords=[Schnell,nicht_konterbar,nicht_veränderbar],
                                       type=0, targets=[True, 0, 0, 0])
-Sicherer_Schlag = Attacke(name="Sicherer Schlag", text="90 Schaden. Schaden nicht veränderbar", keywords=[], type=0,
+Sicherer_Schlag = Attacke(name="Sicherer Schlag", text="90 Schaden", keywords=[nicht_veränderbar], type=0,
                           targets=[True, 0, 0, 0])
-Spiegelschild = Attacke(name="Spiegelschild (WIP)",
+Spiegelschild = Attacke(name="Spiegelschild",
                         text="Wenn du das nächste Mal durch einen Gegner Schaden bekommen würdest, kriegt stattdessen "
                              "dieser Gegner so viel Schaden",
                         keywords=[Einmalig], type=0)
@@ -213,10 +220,10 @@ Waffen_weg = Attacke(name="Waffen weg!", text="Dein Gegner führt alle seine Att
 Wand = Attacke(name="Wand", text="Beschwöre ein 0/50 Monster mit Spott", keywords=[Zweimalig], type=0)
 Wut = Attacke(name="Wut", text="Deine nächste Attacke die Schaden macht, verursacht +20 Schaden",
               keywords=[Einmalig, Extra], type=0)
-Zauberkunststück = Attacke(name="Zauberkunststück (WIP)",
+Zauberkunststück = Attacke(name="Zauberkunststück",
                            text='Erhalte beim Wählen dieser Attacke drei Kopien der Attacke: "erhalte ein zufälliges '
                                 'Gehemnis der Nummern 1-7, du weißt im voraus welches du bekommst"', keywords=[], type=0)
-Zaubertrick = Attacke(name="Zaubertrick (WIP)", text="erhalte ein zufälliges Geheimnis", keywords=[], type=0)
+Zaubertrick = Attacke(name="Zaubertrick", text="erhalte ein zufälliges Geheimnis", keywords=[], type=0)
 Zellteilung = Attacke(name="Zellteilung (WIP)",
                       text="Opfere eines deiner Monster. Beschwöre ein Monster mit gleichen Leben und Attacken wie "
                            "das geopferte Monster am Ende deines Übernächsten Zuges zweimal",
@@ -274,17 +281,19 @@ entferne_Schnell_Schaden = Attacke(name='Event - Effekt von "Schneller" abgelauf
                                    type=2)
 entferne_Wut = Attacke(name="Event - entferne Wut", text="entferne 10 Wut", type=2)
 
-gehemnis1 = Attacke(name="Geheimnis - Bevor ein Gegner dir Schaden macht, verursache ihm 100 Schaden",
-                    text="Bevor ein Gegner dir Schaden macht, verursache ihm 100 Schaden",type=2)
+geheimnis1 = Attacke(name="Geheimnis - Bevor ein Gegner dir Schaden macht, verursache 100 Schaden",
+                    text="Bevor ein Gegner dir Schaden macht, verursache ihm 100 Schaden",type=2,targets=[True,0,0,0])
 
-gehemnis2 = Attacke(name="Geheimnis - Wenn du im Zug eines Gegners keinen Schaden bekommst, verursache 100 Schaden",
-                    text="Wenn du im Zug eines Gegners keinen Schaden bekommst, verursache 100 Schaden",type=2)
+geheimnis2 = Attacke(name="Geheimnis - Wenn du im Zug eines Gegners keinen Schaden bekommst, verursache 100 Schaden",
+                    text="Wenn du im Zug eines Gegners keinen Schaden bekommst, verursache 100 Schaden",type=2,
+                    targets=[True,0,0,0])
 
 geheimnis3 = Attacke(name="Geheimnis - Nachdem ein Gegner dir Schaden macht, heile 100 Leben",
-                     text="Nachdem ein Gegner dir Schaden macht, heile 100 Leben",type=2)
+                     text="Nachdem ein Gegner dir Schaden macht, heile 100 Leben",type=2,targets=[True,0,0,0])
 
 geheimnis4 = Attacke(name="Geheimnis - Wenn du im Zug eines Gegners keinen Schaden bekommst, heile 100 Leben",
-                     text="Wenn du im Zug eines Gegners keinen Schaden bekommst, heile 100Leben",type=2)
+                     text="Wenn du im Zug eines Gegners keinen Schaden bekommst, heile 100Leben",type=2
+                     ,targets=[True,0,0,0])
 
 geheimnis5 = Attacke(name="Geheimnis - Nachdem du Schaden bekommst, beschwöre ein 50/50 Monster",
                      text="Nachdem du Schaden bekommst, beschwöre ein 50/50 Monster",type=2)
@@ -292,7 +301,7 @@ geheimnis5 = Attacke(name="Geheimnis - Nachdem du Schaden bekommst, beschwöre e
 geheimnis6 = Attacke(name="Geheimnis - Wenn du im Zug des Gegners keinen Schaden bekommst, beschwöre ein 50/50 Monster",
                      text="Wenn du im Zug des Gegners keinen Schaden bekommst, beschwöre ein 50/50 Monster",type=2)
 
-gehemnis7 = Attacke(name="Geheimnis - Wenn du Schaden bekommen würdest, verhindere 150 des Schadens",
+geheimnis7 = Attacke(name="Geheimnis - Wenn du Schaden bekommen würdest, verhindere 150 des Schadens",
                     text="Wenn du Schaden bekommen würdest, verhindere 150 des Schadens",type=2)
 
 geheimnis8 = Attacke(name="Geheimnis - Wähle zu Beginn deines Zuges erhalte zwei zufällige Geheimnissen",
@@ -301,9 +310,15 @@ geheimnis8 = Attacke(name="Geheimnis - Wähle zu Beginn deines Zuges erhalte zwe
 geheimnis9 = Attacke(name="Geheimnis - Wenn ein Gegner dir tödlichen Schaden machen würde, verhindere jenen Schaden",
                      text="Wenn ein Gegner dir tödlichen Schaden machen würde, verhindere jenen Schade",type=2)
 
-geheimnis10 = Attacke(name="Geheimnis - Wenn ein Gegner dir Schaden verursachen würde bekommt er stattdessen den Schade"
-                           "n", text="Wenn ein Gegner dir Schaden verursachen würde bekommt er stattdessen den Schaden",
-                      type=2)
+geheimnis10 = Attacke(name="Geheimnis - Wenn ein Gegner dir Schaden verursachen würde, lenke den Schaden um",
+                      text="Geheimnis - Wenn ein Gegner dir Schaden verursachen würde, lenke den Schaden um",
+                      type=2,targets=[True,0,0,0])
+
+all_geheimnisse = [Geheimnis(geheimnis1,0),Geheimnis(geheimnis2,2),Geheimnis(geheimnis3,1),Geheimnis(geheimnis4,2),
+                   Geheimnis(geheimnis5,1),Geheimnis(geheimnis6,2),Geheimnis(geheimnis7),Geheimnis(geheimnis8,3),
+                   Geheimnis(geheimnis9),Geheimnis(geheimnis10)]
+
+Zauberkunstück_Teil = Attacke(name="Zauberkünstück - Teil",text="",type=2)
 
 @dataclass
 class Client:
@@ -334,13 +349,13 @@ lobbies = []
 async def ask_targets(client, t_1: bool = False, t_atk: bool = False, t_stk: bool = False, t_2: bool = False):
     a, b, c, d = None, None, None, None
     if t_atk:
-        a, b = await client.getatktarget()  #TODO
+        a, b = await client.getatktarget()
     elif t_1:
-        a = await client.getcharactertarget()  # TODO
+        a = await client.getcharactertarget()
     if t_stk:
-        c = await client.getstacktarget()  #TODO
+        c = await client.getstacktarget()
     if t_2:
-        d = await client.getcharactertarget()  #TODO
+        d = await client.getcharactertarget()
     return a, b, c, d
 
 
@@ -373,20 +388,27 @@ async def spieler_beitreten(lobbycode: str, spielername: str, client):
 def atk_entschieden(lobby: Lobby, c1: Client, atken1: list[Attacke], c2: Client, atken2: list[Attacke]):
     if lobby.phase == 0:
         lobby.phase = 1
-        count = 0
         for atk in atken1:
-            b_atk = AttackeBesitz(attacke=atk)
-            c1.spieler.stats.attacken.append(b_atk)
-            if Passiv in atk.keywords:
-                c2.spieler.atk_known.append(b_atk)
-            count += 1
-        count = 0
+            if atk.name != "Zauberkunststück":
+                b_atk = AttackeBesitz(attacke=atk)
+                c1.spieler.stats.attacken.append(b_atk)
+                if Passiv in atk.keywords:
+                    c2.spieler.atk_known.append(b_atk)
+            else:
+                for _ in range(3):
+                    b_atk = AttackeBesitz(attacke=replace(Zauberkunstück_Teil,type=0))
+                    c1.spieler.stats.attacken.append(b_atk)
         for atk in atken2:
-            b_atk = AttackeBesitz(attacke=atk)
-            c2.spieler.stats.attacken.append(b_atk)
-            if Passiv in atk.keywords:
-                c1.spieler.atk_known.append(b_atk)
-            count += 1
+            if atk.name != "Zauberkunststück":
+                b_atk = AttackeBesitz(attacke=atk)
+                c2.spieler.stats.attacken.append(b_atk)
+                if Passiv in atk.keywords:
+                    c1.spieler.atk_known.append(b_atk)
+            else:
+                for _ in range(3):
+                    b_atk = AttackeBesitz(attacke=replace(Zauberkunstück_Teil,type=0))
+                    c2.spieler.stats.attacken.append(b_atk)
+
         apply_passives(c1.spieler)
         apply_passives(c2.spieler)
 
@@ -417,6 +439,11 @@ async def leben_zahlen(lobby: Lobby, c1: Client, pay1: int, c2: Client, pay2: in
         await passen(lobby)
 
 
+def get_new_zauberkünstück_teil(attacke:AttackeBesitz):
+    s = get_rnd_secrt()
+    attacke_new = replace(attacke.attacke,text=s.name)
+    attacke.attacke = attacke_new
+
 async def passen(lobby: Lobby):
     if lobby.phase == 2:
         if not lobby.reaktion:
@@ -430,6 +457,37 @@ async def passen(lobby: Lobby):
                 match lobby.turntime % 10:
                     case 0:
                         pl = lobby.clients[lobby.starting].spieler
+                        #check eot no dmg secret trigger
+                        if not pl.stats.took_dmg_this_turn:
+                            for geheimnis in pl.stats.geheimnisse:
+                                if geheimnis.trigger == 2:
+                                    await execute_geheimnis(lobby,geheimnis,pl)
+                        for mon in pl.monster:
+                            if not mon.stats.took_dmg_this_turn:
+                                for geheimnis in mon.stats.geheimnisse:
+                                    if geheimnis.trigger == 2:
+                                        await execute_geheimnis(lobby, geheimnis, mon)
+                        #reset no dmg of other player
+                        lobby.clients[lobby.starting-1].spieler.stats.took_dmg_this_turn = False
+                        for mon in lobby.clients[lobby.starting-1].spieler.monster:
+                            mon.stats.took_dmg_this_turn = False
+                        #reset zauberkünstück teil
+                        for attacke in pl.stats.attacken:
+                            if attacke.attacke.name == Zauberkunstück_Teil.name:
+                                get_new_zauberkünstück_teil(attacke)
+                        for mon in pl.monster:
+                            for attacke in mon.stats.attacken:
+                                if attacke.attacke.name == Zauberkunstück_Teil.name:
+                                    get_new_zauberkünstück_teil(attacke)
+                        #trigger bot secrets
+                        for geheimnis in pl.stats.geheimnisse:
+                            if geheimnis.trigger == 3:
+                                await execute_geheimnis(lobby,geheimnis,pl)
+                        for mon in pl.monster:
+                            for geheimnis in mon.stats.geheimnisse:
+                                if geheimnis.trigger == 3:
+                                    await execute_geheimnis(lobby, geheimnis, mon)
+                        #normal
                         if pl.stop_start:
                             found = True
                             lobby.priority = lobby.starting
@@ -446,6 +504,37 @@ async def passen(lobby: Lobby):
                             lobby.priority = (lobby.starting - 1) % 2
                     case 5:
                         pl = lobby.clients[lobby.starting - 1].spieler
+                        # check eot no dmg secret trigger
+                        if not pl.stats.took_dmg_this_turn:
+                            for geheimnis in pl.stats.geheimnisse:
+                                if geheimnis.trigger == 2:
+                                    await execute_geheimnis(lobby, geheimnis, pl)
+                        for mon in pl.monster:
+                            if not mon.stats.took_dmg_this_turn:
+                                for geheimnis in mon.stats.geheimnisse:
+                                    if geheimnis.trigger == 2:
+                                        await execute_geheimnis(lobby, geheimnis, mon)
+                        # reset no dmg of other player
+                        lobby.clients[lobby.starting - 1].spieler.stats.took_dmg_this_turn = False
+                        for mon in lobby.clients[lobby.starting - 1].spieler.monster:
+                            mon.stats.took_dmg_this_turn = False
+                        # reset zauberkünstück teil
+                        for attacke in pl.stats.attacken:
+                            if attacke.attacke.name == Zauberkunstück_Teil.name:
+                                get_new_zauberkünstück_teil(attacke)
+                        for mon in pl.monster:
+                            for attacke in mon.stats.attacken:
+                                if attacke.attacke.name == Zauberkunstück_Teil.name:
+                                    get_new_zauberkünstück_teil(attacke)
+                        # trigger bot secrets
+                        for geheimnis in pl.stats.geheimnisse:
+                            if geheimnis.trigger == 3:
+                                await execute_geheimnis(lobby, geheimnis, pl)
+                        for mon in pl.monster:
+                            for geheimnis in mon.stats.geheimnisse:
+                                if geheimnis.trigger == 3:
+                                    await execute_geheimnis(lobby, geheimnis, mon)
+                        # normal
                         if pl.stop_start:
                             found = True
                             lobby.priority = (lobby.starting - 1) % 2
@@ -518,13 +607,88 @@ def is_my_turn(lobby: Lobby, character: Spieler | Monster):
     time = lobby.turntime
     return (time // 5) % 2 != (id == start)
 
+async def execute_geheimnis(lobby:Lobby, geheimnis:Geheimnis,owner:Spieler|Monster):
+    g_t = geheimnis.attacke.targets
+    t_1,t_atk,t_stk,t_2 = await ask_targets(lobby.clients[owner.spieler_id-1].client,g_t[0],g_t[1],g_t[2],g_t[3])
+    atk = AttackeEingesetzt(attacke=geheimnis.attacke,owner=owner,ausgeführt=1,t_1=t_1
+                                                  ,t_atk=t_atk,t_stk=t_stk,t_2=t_2)
+    lobby.stack.attacken.append(atk)
+    match geheimnis.attacke.name:
+        case geheimnis1.name | geheimnis2.name:
+            await damage(lobby,100,atk,1)
+            await check_winner(lobby)
+            check_monster(lobby)
+        case geheimnis3.name | geheimnis4.name:
+            heilen(lobby,atk,100)
+        case geheimnis5.name | geheimnis6.name:
+            monster(lobby,owner,50,50)
+        case geheimnis10.name:
+            await damage(lobby,geheimnis.mod,atk,1)
+            await check_winner(lobby)
+            check_monster(lobby)
+        case geheimnis8.name:
+            await cst_rnd_secrt(lobby,owner)
+            await cst_rnd_secrt(lobby,owner)
+    owner.stats.ausgelöst.append(geheimnis)
+    owner.stats.geheimnisse.remove(geheimnis)
 
-async def dmg(lobby:Lobby,target:Spieler|Monster,damage:int,owner:Spieler|Monster):
-    target.stats.leben -= damage
-    if is_my_turn(lobby, target):
-        target.stats.n_selbstschaden += damage
+
+async def cst_rnd_secrt(lobby:Lobby,target:Spieler|Monster):
+    s = get_rnd_secrt()
+    await lobby.clients[target.spieler_id].client.message("Neu: " + s.name)
+    target.stats.geheimnisse.append(s)
 
 
+async def dmg(lobby:Lobby, target:Spieler|Monster, damg:int, owner: Spieler | Monster, veränderbar:bool=True):
+    before_dmg = []
+    after_dmg = []
+    iceblock: Geheimnis | None=None
+    reflect: Geheimnis | None=None
+    onefivezero: Geheimnis | None=None
+    if damg > 0:
+        for geheimnis in target.stats.geheimnisse:
+            match geheimnis.trigger:
+                case 0:
+                    before_dmg.append(geheimnis)
+                case 1:
+                    after_dmg.append(geheimnis)
+                case _:
+                    if geheimnis.attacke.name == geheimnis9.name:
+                        iceblock = geheimnis
+                    elif geheimnis.attacke.name == geheimnis10.name:
+                        reflect = geheimnis
+                    elif geheimnis.attacke.name == geheimnis7.name:
+                        onefivezero = geheimnis
+        for geheimnis in before_dmg:
+            await execute_geheimnis(lobby,geheimnis,target)
+        if reflect and owner.spieler_id != target.spieler_id:
+            reflect.mod=damg
+            damg = 0
+            await execute_geheimnis(lobby,reflect,target)
+        if target.stats.spiegelschilder > 0 and owner.spieler_id != target.spieler_id:
+            target.stats.spiegelschilder -= 1
+            await damage(lobby,damg,AttackeEingesetzt(attacke=Schwertschlag,owner=owner,t_1=owner))
+            damg = 0
+        elif damg > target.stats.leben and iceblock and owner.spieler_id != target.spieler_id:
+            damg = 0
+            await execute_geheimnis(lobby,iceblock,target)
+        elif damg > target.stats.leben and target.stats.letze_chancen > 0:
+            damg = 0
+            target.stats.letze_chancen -= 1
+            heilen(lobby,AttackeEingesetzt(attacke=Heilung,owner=target,t_1=target),50)
+        elif onefivezero and veränderbar:
+            damg = max(0, damg - 150)
+            await execute_geheimnis(lobby,onefivezero,target)
+        if damg > 0:
+            target.stats.leben -= damg
+            if is_my_turn(lobby, target):
+                target.stats.n_selbstschaden += damg
+            target.stats.took_dmg_this_turn = True
+        for geheimnis in after_dmg:
+            await execute_geheimnis(lobby,geheimnis,target)
+
+def get_rnd_secrt():
+    return random.choice(all_geheimnisse)
 
 async def attacke_einsetzen(lobby: Lobby, owner: Spieler | Monster, attacke: AttackeBesitz,
                             t_1: Spieler | Monster | None = None, t_atk: AttackeBesitz | None = None,
@@ -660,10 +824,14 @@ def dmg_mod(target: Spieler | Monster, mod: int):
 
 
 def ist_konterbar(attacke: Attacke):
-    if attacke.name in ["Geheime Mission", "Sichere und geheime Mission"]:
+    if nicht_konterbar in attacke.keywords:
         return False
     else:
         return True
+
+
+def zerstöre_monster(monster:Monster):
+    monster.stats.leben = 0
 
 
 def check_monster(lobby: Lobby):
@@ -889,7 +1057,7 @@ async def attacken_ausführen(lobby: Lobby):
                         case "Lehren":
                             lehre(atk.t_1, AttackeBesitz(attacke=Schwertschlag))
                         case "Letzte Chance":
-                            pass
+                            atk.owner.stats.letze_chancen+=1
                         case "Letzter Wille":
                             await damage(lobby, 20, atk, 5)
                         case "Meister der Magie":
@@ -899,9 +1067,16 @@ async def attacken_ausführen(lobby: Lobby):
                         case "Messerwürfe":
                             await damage(lobby, 20, atk, 4)
                         case "Opfer":
-                            pass
+                            if atk.t_1.is_monster and atk.t_1.spieler_id == atk.owner.spieler_id:
+                                leben = atk.t_1.stats.leben
+                                sp = lobby.clients[atk.owner.spieler_id].spieler
+                                erhalte_leben(sp,leben)
+                                for mon in sp.monster:
+                                    erhalte_leben(mon,leben)
+                                zerstöre_monster(atk.t_1)
                         case "Prestige":
-                            pass
+                            for scrt in atk.owner.stats.ausgelöst:
+                                atk.owner.stats.geheimnisse.append(scrt)
                         case "Schild und Schwert":
                             await damage(lobby, 50, atk)
                             block(lobby, atk.t_stk, 50)
@@ -931,12 +1106,12 @@ async def attacken_ausführen(lobby: Lobby):
                             await damage(lobby, 120, atk)
                         case "Sichere und geheime Mission":
                             target = other_spott(lobby, atk.t_1)
-                            await dmg(lobby,target,70,atk.owner)
+                            await dmg(lobby,target,60,atk.owner,False)
                         case "Sicherer Schlag":
                             target = other_spott(lobby,atk.t_1)
-                            await dmg(lobby,target,90,atk.owner)
+                            await dmg(lobby,target,90,atk.owner,False)
                         case "Spiegelschild":
-                            pass
+                            atk.owner.stats.spiegelschilder += 1
                         case "Verrat":
                             await damage(lobby, 80, atk)
                         case "Vorbereitung":
@@ -961,10 +1136,13 @@ async def attacken_ausführen(lobby: Lobby):
                             monster(lobby, atk.owner, 0, 50, True)
                         case "Wut":
                             dmg_mod(atk.owner, 20)
-                        case "Zauberkunststück":
-                            pass
+                        case "Zauberkunststück - Teil":
+                            for scrt in all_geheimnisse:
+                                if scrt.attacke.name == atk.attacke.text:
+                                    atk.owner.stats.geheimnisse.append(scrt)
+                                    await lobby.clients[atk.owner.spieler_id].client.message("Neu: " + scrt.attacke.name)
                         case "Zaubertrick":
-                            pass
+                            await cst_rnd_secrt(lobby,atk.owner)
                         case "Zellteilung":
                             pass
                         case "Zwei Wünsche":
@@ -1017,4 +1195,4 @@ async def attacken_ausführen(lobby: Lobby):
                 if len(stk_atk)>counter:
                     counter += 1
                 else:
-                    break 
+                    break
