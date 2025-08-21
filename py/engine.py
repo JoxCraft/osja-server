@@ -25,6 +25,7 @@ class Attacke:
     type: int  #0 für normale Attacke, 1 für Rangelei, 2 für background Attacke (hauptsächlich für events)
     targets: list[bool] = field(default_factory=lambda: [0, 0, 0, 0])  #t_1, t_atk, t_stk, t_2
     keywords: list[Keyword] = field(default_factory=list)
+    extra_info: int=0
 
 
 @dataclass
@@ -317,7 +318,12 @@ all_geheimnisse = [Geheimnis(geheimnis1,0),Geheimnis(geheimnis2,2),Geheimnis(geh
                    Geheimnis(geheimnis5,1),Geheimnis(geheimnis6,2),Geheimnis(geheimnis7),Geheimnis(geheimnis8,3),
                    Geheimnis(geheimnis9),Geheimnis(geheimnis10)]
 
-Zauberkunstück_Teil = Attacke(name="Zauberkünstück - Teil",text="",type=2)
+Zauberkunstück_Teil1 = Attacke(name="Zauberkünstück - Teil 1/3",text="Wirke eines der Geheimnisse von 1-7, du weißt "
+                                                                     "genau welches",type=2)
+Zauberkunstück_Teil2 = Attacke(name="Zauberkünstück - Teil 2/3",text="Wirke eines der Geheimnisse von 1-7, du weißt "
+                                                                     "genau welches",type=2)
+Zauberkunstück_Teil3 = Attacke(name="Zauberkünstück - Teil 3/3",text="Wirke eines der Geheimnisse von 1-7, du weißt"
+                                                                     " genau welches",type=2)
 
 @dataclass
 class Client:
@@ -394,9 +400,12 @@ def atk_entschieden(lobby: Lobby, c1: Client, atken1: list[Attacke], c2: Client,
                 if Passiv in atk.keywords:
                     c2.spieler.atk_known.append(b_atk)
             else:
-                for _ in range(3):
-                    b_atk = AttackeBesitz(attacke=replace(Zauberkunstück_Teil,type=0))
-                    c1.spieler.stats.attacken.append(b_atk)
+                b_atk = AttackeBesitz(attacke=replace(Zauberkunstück_Teil1,type=0))
+                c1.spieler.stats.attacken.append(b_atk)
+                b_atk = AttackeBesitz(attacke=replace(Zauberkunstück_Teil2, type=0))
+                c1.spieler.stats.attacken.append(b_atk)
+                b_atk = AttackeBesitz(attacke=replace(Zauberkunstück_Teil3, type=0))
+                c1.spieler.stats.attacken.append(b_atk)
         for atk in atken2:
             if atk.name != "Zauberkunststück":
                 b_atk = AttackeBesitz(attacke=atk)
@@ -404,9 +413,12 @@ def atk_entschieden(lobby: Lobby, c1: Client, atken1: list[Attacke], c2: Client,
                 if Passiv in atk.keywords:
                     c1.spieler.atk_known.append(b_atk)
             else:
-                for _ in range(3):
-                    b_atk = AttackeBesitz(attacke=replace(Zauberkunstück_Teil,type=0))
-                    c2.spieler.stats.attacken.append(b_atk)
+                b_atk = AttackeBesitz(attacke=replace(Zauberkunstück_Teil1, type=0))
+                c2.spieler.stats.attacken.append(b_atk)
+                b_atk = AttackeBesitz(attacke=replace(Zauberkunstück_Teil2, type=0))
+                c2.spieler.stats.attacken.append(b_atk)
+                b_atk = AttackeBesitz(attacke=replace(Zauberkunstück_Teil3, type=0))
+                c2.spieler.stats.attacken.append(b_atk)
 
         apply_passives(c1.spieler)
         apply_passives(c2.spieler)
@@ -438,10 +450,10 @@ async def leben_zahlen(lobby: Lobby, c1: Client, pay1: int, c2: Client, pay2: in
         await passen(lobby)
 
 
-def get_new_zauberkunstück_teil(attacke:AttackeBesitz):
+async def get_new_zauberkunstück_teil(lobby:Lobby,owner:Spieler|Monster,attacke:AttackeBesitz):
     s = get_rnd_secrt(7)
-    attacke_new = replace(attacke.attacke,text=s.attacke.name)
-    attacke.attacke = attacke_new
+    attacke.attacke = replace(attacke.attacke,extra_info=all_geheimnisse.index(s))
+    await lobby.clients[owner.spieler_id].client.message("Teil " + attacke.attacke.name[-3] + ": " + s.attacke.text)
 
 async def passen(lobby: Lobby):
     if lobby.phase == 2:
@@ -472,12 +484,12 @@ async def passen(lobby: Lobby):
                             mon.stats.took_dmg_this_turn = False
                         #reset zauberkünstück teil
                         for attacke in pl.stats.attacken:
-                            if attacke.attacke.name == Zauberkunstück_Teil.name:
-                                get_new_zauberkunstück_teil(attacke)
+                            if attacke.attacke.name[:-2] == Zauberkunstück_Teil1.name[:-2]:
+                                await get_new_zauberkunstück_teil(lobby,pl,attacke)
                         for mon in pl.monster:
                             for attacke in mon.stats.attacken:
-                                if attacke.attacke.name == Zauberkunstück_Teil.name:
-                                    get_new_zauberkunstück_teil(attacke)
+                                if attacke.attacke.name[:-2] == Zauberkunstück_Teil1.name[:-2]:
+                                    await get_new_zauberkunstück_teil(lobby,mon,attacke)
                         #trigger bot secrets
                         for geheimnis in pl.stats.geheimnisse:
                             if geheimnis.trigger == 3:
@@ -519,12 +531,12 @@ async def passen(lobby: Lobby):
                             mon.stats.took_dmg_this_turn = False
                         # reset zauberkünstück teil
                         for attacke in pl.stats.attacken:
-                            if attacke.attacke.name == Zauberkunstück_Teil.name:
-                                get_new_zauberkunstück_teil(attacke)
+                            if attacke.attacke.name[:-2] == Zauberkunstück_Teil1.name[:-2]:
+                                await get_new_zauberkunstück_teil(lobby,pl,attacke)
                         for mon in pl.monster:
                             for attacke in mon.stats.attacken:
-                                if attacke.attacke.name == Zauberkunstück_Teil.name:
-                                    get_new_zauberkunstück_teil(attacke)
+                                if attacke.attacke.name[:-2] == Zauberkunstück_Teil1.name[:-2]:
+                                    await get_new_zauberkunstück_teil(lobby,mon,attacke)
                         # trigger bot secrets
                         for geheimnis in pl.stats.geheimnisse:
                             if geheimnis.trigger == 3:
@@ -1146,9 +1158,7 @@ async def attacken_ausführen(lobby: Lobby):
                         case "Wut":
                             dmg_mod(atk.owner, 20)
                         case "Zauberkunststück - Teil":
-                            for scrt in all_geheimnisse:
-                                if scrt.attacke.name == atk.attacke.text:
-                                    await add_secret_to_secrets(lobby,atk.owner,scrt)
+                            await add_secret_to_secrets(lobby,atk.owner,all_geheimnisse[atk.attacke.extra_info])
                         case "Zaubertrick":
                             await cst_rnd_secrt(lobby,atk.owner)
                         case "Zellteilung":
