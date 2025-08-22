@@ -634,22 +634,18 @@ def is_my_turn(lobby: Lobby, character: Spieler | Monster):
 
 
 async def execute_geheimnis(lobby: Lobby, geheimnis: Geheimnis, owner: Spieler | Monster):
+    await attacken_ausführen(lobby)
     g_t = geheimnis.attacke.targets
     owner.stats.ausgelöst.append(geheimnis)
     owner.stats.geheimnisse.remove(geheimnis)
-
-    atk = AttackeEingesetzt(
-        attacke=geheimnis.attacke, owner=owner,
-        mod=geheimnis.mod)
-    lobby.stack.attacken.append(atk)
-
     t_1, t_atk, t_stk, t_2 = await ask_targets(
         lobby, lobby.clients[owner.spieler_id].client, g_t[0], g_t[1], g_t[2], g_t[3]
     )
-    atk.t_1 = t_1
-    atk.t_atk = t_atk
-    atk.t_stk = t_stk
-    atk.t_2 = t_2
+    atk = AttackeEingesetzt(
+        attacke=geheimnis.attacke, owner=owner,
+        t_1=t_1, t_atk=t_atk, t_stk=t_stk, t_2=t_2,mod=geheimnis.mod
+    )
+    lobby.stack.attacken.append(atk)
     await attacken_ausführen(lobby)
 
 
