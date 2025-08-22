@@ -291,8 +291,8 @@ geheimnis2 = Attacke(name="Geheimnis - Wenn du im Zug eines Gegners keinen Schad
                      text="Wenn du im Zug eines Gegners keinen Schaden bekommst, verursache 100 Schaden", type=2,
                      targets=[True, 0, 0, 0])
 
-geheimnis3 = Attacke(name="Geheimnis - Nachdem ein Gegner dir Schaden macht, heile 100 Leben",
-                     text="Nachdem ein Gegner dir Schaden macht, heile 100 Leben", type=2, targets=[True, 0, 0, 0])
+geheimnis3 = Attacke(name="Geheimnis - Wenn ein Gegner dir Schaden macht, heile 100 Leben",
+                     text="Wenn ein Gegner dir Schaden macht, heile 100 Leben", type=2, targets=[True, 0, 0, 0])
 
 geheimnis4 = Attacke(name="Geheimnis - Wenn du im Zug eines Gegners keinen Schaden bekommst, heile 100 Leben",
                      text="Wenn du im Zug eines Gegners keinen Schaden bekommst, heile 100 Leben", type=2
@@ -707,8 +707,8 @@ async def dmg(lobby: Lobby, target: Spieler | Monster, damg: int, owner: Spieler
             if is_my_turn(lobby, target):
                 target.stats.n_selbstschaden += damg
             target.stats.took_dmg_this_turn = True
-        for geheimnis in after_dmg:
-            await execute_geheimnis(lobby, geheimnis, target)
+            for geheimnis in after_dmg:
+                await execute_geheimnis(lobby, geheimnis, target)
 
 
 def get_rnd_secrt(end: int = len(all_geheimnisse)):
