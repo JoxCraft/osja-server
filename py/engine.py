@@ -119,7 +119,7 @@ nicht_konterbar = Keyword(name="nicht konterbar", text="Attacke kann nicht gekon
 nicht_veränderbar = Keyword(name="nicht veränderbar", text="Schaden der Attacke kann nicht verändert werden",
                             category=8)
 
-Alles_oder_nichts = Attacke(name="",
+Alles_oder_nichts = Attacke(name="Alles oder nichts",
                             text="Wähle eine deiner nicht Xmalig- und nicht Superattacken und "
                                  "entferne sie vom Spiel. Führe sie am Ende des nächsten gegnerischen Zuges "
                                  "zweimal aus",
