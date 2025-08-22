@@ -1113,7 +1113,8 @@ async def attacken_ausführen(lobby: Lobby):
                                 sp = lobby.clients[atk.owner.spieler_id].spieler
                                 erhalte_leben(sp, leben)
                                 for mon in sp.monster:
-                                    erhalte_leben(mon, leben)
+                                    if mon != atk.t_1:
+                                        erhalte_leben(mon, leben)
                                 zerstöre_monster(atk.t_1)
                         case "Prestige":
                             for scrt in atk.owner.stats.ausgelöst:
