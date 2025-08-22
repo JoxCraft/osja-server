@@ -1008,8 +1008,9 @@ async def attacken_ausführen(lobby: Lobby):
                         case "Alles oder nichts":
                             if atk.t_1 == atk.owner:
                                 dupe = replace(atk.t_atk, attacke=replace(atk.t_atk.attacke, type=2))
+                                opp = lobby.clients[atk.owner.spieler_id - 1].spieler
                                 if atk.t_atk not in opp.atk_known:
-                                    opp.atk_known.append(t_atk)
+                                    opp.atk_known.append(atk.t_atk)
                                 attacke_zerstören(atk.t_1, atk.t_atk)
                                 l_ask = dupe.attacke.targets
                                 t_1, t_atk, t_stk, t_2 = await ask_targets(lobby,
@@ -1018,7 +1019,6 @@ async def attacken_ausführen(lobby: Lobby):
                                 ev = Event(time=(lobby.turntime // 10) * 10 + 10,
                                            event=AttackeEingesetzt(attacke=dupe.attacke, owner=atk.owner, t_1=t_1,
                                                                    t_atk=t_atk, t_stk=t_stk, t_2=t_2))
-                                opp = lobby.clients[atk.owner.spieler_id - 1].spieler
                                 lobby.events.append(ev)
                                 lobby.events.append(copy.deepcopy(ev))
                         case "Alles wird gut!":
