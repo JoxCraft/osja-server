@@ -967,8 +967,8 @@ async def attacken_ausführen(lobby: Lobby):
         stk_atk = lobby.stack.attacken
         counter = len(stk_atk)-1
         if stk_atk:
-            while stk_atk[-counter].ausgeführt != 1:
-                atk = stk_atk[-counter]
+            while stk_atk[counter].ausgeführt != 1:
+                atk = stk_atk[counter]
                 if atk.ausgeführt == 0:
                     atk.ausgeführt = 1
                     if atk.attacke.type != 2:
