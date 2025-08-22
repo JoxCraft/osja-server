@@ -472,9 +472,10 @@ async def passen(lobby: Lobby):
             found = False
             while not found:
                 lobby.turntime += 1
-                for event in lobby.events:
+                for event in copy.deepcopy(lobby.events):
                     if event.time == lobby.turntime:
                         lobby.stack.attacken.append(event.event)
+                        lobby.events.remove(event)
                 await attacken_ausführen(lobby)
                 match lobby.turntime % 10:
                     case 0:
@@ -982,7 +983,7 @@ async def attacken_ausführen(lobby: Lobby):
         stk_atk = lobby.stack.attacken
         counter = len(stk_atk) - 1
         if stk_atk:
-            while counter >= 0:
+            while stk_atk[counter].ausgeführt != 1:
                 atk = stk_atk[counter]
                 if atk.ausgeführt == 0:
                     atk.ausgeführt = 1
@@ -1113,10 +1114,9 @@ async def attacken_ausführen(lobby: Lobby):
                                 leben = atk.t_1.stats.leben
                                 sp = lobby.clients[atk.owner.spieler_id].spieler
                                 erhalte_leben(sp, leben)
-                                for mon in sp.monster:
-                                    if mon != atk.t_1:
-                                        erhalte_leben(mon, leben)
                                 zerstöre_monster(atk.t_1)
+                                for mon in sp.monster:
+                                    erhalte_leben(mon, leben)
                         case "Prestige":
                             for scrt in atk.owner.stats.ausgelöst:
                                 await add_secret_to_secrets(lobby, atk.owner, scrt)
@@ -1235,6 +1235,7 @@ async def attacken_ausführen(lobby: Lobby):
                             add_wut(atk.owner, -10)
                     check_monster(lobby)
                     await check_winner(lobby)
+                if counter >= 0:
                     counter -= 1
                 else:
                     break
