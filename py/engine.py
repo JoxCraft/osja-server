@@ -529,8 +529,8 @@ async def passen(lobby: Lobby):
                                     if geheimnis.trigger == 2:
                                         await execute_geheimnis(lobby, geheimnis, mon)
                         # reset no dmg of other player
-                        lobby.clients[lobby.starting - 1].spieler.stats.took_dmg_this_turn = False
-                        for mon in lobby.clients[lobby.starting - 1].spieler.monster:
+                        lobby.clients[lobby.starting].spieler.stats.took_dmg_this_turn = False
+                        for mon in lobby.clients[lobby.starting].spieler.monster:
                             mon.stats.took_dmg_this_turn = False
                         # reset zauberkünstück teil
                         for attacke in pl.stats.attacken:
