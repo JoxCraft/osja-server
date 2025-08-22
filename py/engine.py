@@ -965,7 +965,7 @@ def attacke_zerstören(target1: Spieler | Monster, target2: AttackeBesitz):
 async def attacken_ausführen(lobby: Lobby):
     if lobby.phase == 2:
         stk_atk = lobby.stack.attacken
-        counter = 1
+        counter = len(stk_atk)-1
         if stk_atk:
             while stk_atk[-counter].ausgeführt != 1:
                 atk = stk_atk[-counter]
@@ -1216,7 +1216,7 @@ async def attacken_ausführen(lobby: Lobby):
                             add_wut(atk.owner, -10)
                     check_monster(lobby)
                     await check_winner(lobby)
-                if len(stk_atk)>counter:
-                    counter += 1
+                if counter>=0:
+                    counter -= 1
                 else:
                     break
