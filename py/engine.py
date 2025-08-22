@@ -329,6 +329,8 @@ Zauberkunstück_Teil2 = Attacke(name="Zauberkunstück - Teil 2/3", text="Wirke e
 Zauberkunstück_Teil3 = Attacke(name="Zauberkunstück - Teil 3/3", text="Wirke eines der Geheimnisse von 1-7, du weißt"
                                                                       " genau welches", type=2)
 
+Zyklus_des_Lebens_trigger = Attacke(name="Event - Zyklus des Lebens", text="Belebe ein Monster wider",type=2)
+
 
 @dataclass
 class Client:
@@ -635,27 +637,16 @@ async def execute_geheimnis(lobby: Lobby, geheimnis: Geheimnis, owner: Spieler |
     g_t = geheimnis.attacke.targets
     owner.stats.ausgelöst.append(geheimnis)
     owner.stats.geheimnisse.remove(geheimnis)
-    t_1, t_atk, t_stk, t_2 = await ask_targets(lobby, lobby.clients[owner.spieler_id].client, g_t[0], g_t[1],
-                                               g_t[2], g_t[3])
-    atk = AttackeEingesetzt(attacke=geheimnis.attacke, owner=owner, ausgeführt=1, t_1=t_1
-                            , t_atk=t_atk, t_stk=t_stk, t_2=t_2)
+
+    t_1, t_atk, t_stk, t_2 = await ask_targets(
+        lobby, lobby.clients[owner.spieler_id].client, g_t[0], g_t[1], g_t[2], g_t[3]
+    )
+    atk = AttackeEingesetzt(
+        attacke=geheimnis.attacke, owner=owner,
+        t_1=t_1, t_atk=t_atk, t_stk=t_stk, t_2=t_2,mod=geheimnis.mod
+    )
     lobby.stack.attacken.append(atk)
-    match geheimnis.attacke.name:
-        case geheimnis1.name | geheimnis2.name:
-            await damage(lobby, 100, atk, 1)
-            await check_winner(lobby)
-            check_monster(lobby)
-        case geheimnis3.name | geheimnis4.name:
-            heilen(lobby, atk, 100)
-        case geheimnis5.name | geheimnis6.name:
-            monster(lobby, owner, 50, 50)
-        case geheimnis10.name:
-            await damage(lobby, geheimnis.mod, atk, 1)
-            await check_winner(lobby)
-            check_monster(lobby)
-        case geheimnis8.name:
-            await cst_rnd_secrt(lobby, owner)
-            await cst_rnd_secrt(lobby, owner)
+    await attacken_ausführen(lobby)
 
 
 async def cst_rnd_secrt(lobby: Lobby, target: Spieler | Monster):
@@ -867,7 +858,7 @@ def zerstöre_monster(monster: Monster):
     monster.stats.leben = 0
 
 
-def check_monster(lobby: Lobby):
+async def check_monster(lobby: Lobby):
     for client in lobby.clients:
         alive = []
         for mon in client.spieler.monster:
@@ -879,7 +870,8 @@ def check_monster(lobby: Lobby):
                     if any(ab.attacke.name is Zyklus_des_Lebens.name for ab in client.spieler.stats.attacken):
                         if len(client.spieler.gy) > 0:
                             gy_ok = False
-                            resurrect(lobby, client.spieler, False)
+                            lobby.stack.attacken.append(AttackeEingesetzt(attacke=Zyklus_des_Lebens_trigger,owner=client.spieler))
+                            await attacken_ausführen(lobby)
                 if gy_ok:
                     client.spieler.gy.append(mon)
         client.spieler.monster = alive
@@ -1115,7 +1107,7 @@ async def attacken_ausführen(lobby: Lobby):
                                 sp = lobby.clients[atk.owner.spieler_id].spieler
                                 erhalte_leben(sp, leben)
                                 zerstöre_monster(atk.t_1)
-                                check_monster(lobby)
+                                await check_monster(lobby)
                                 for mon in sp.monster:
                                     erhalte_leben(mon, leben)
                         case "Prestige":
@@ -1234,7 +1226,22 @@ async def attacken_ausführen(lobby: Lobby):
                             remove_key(kein_Schaden, atk.t_atk)
                         case "Event - entferne Wut":
                             add_wut(atk.owner, -10)
-                    check_monster(lobby)
+                        case geheimnis1.name | geheimnis2.name:
+                            await damage(lobby, 100, atk, 1)
+                            await check_winner(lobby)
+                        case geheimnis3.name | geheimnis4.name:
+                            heilen(lobby, atk, 100)
+                        case geheimnis5.name | geheimnis6.name:
+                            monster(lobby, atk.owner, 50, 50)
+                        case geheimnis10.name:
+                            await damage(lobby, atk.mod, atk, 1)
+                            await check_winner(lobby)
+                        case geheimnis8.name:
+                            await cst_rnd_secrt(lobby, atk.owner)
+                            await cst_rnd_secrt(lobby, atk.owner)
+                        case Zyklus_des_Lebens_trigger.name:
+                            resurrect(lobby,atk.owner,False)
+                    await check_monster(lobby)
                     await check_winner(lobby)
                 if counter >= 0:
                     counter -= 1
