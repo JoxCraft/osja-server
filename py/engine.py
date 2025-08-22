@@ -982,7 +982,7 @@ async def attacken_ausführen(lobby: Lobby):
         stk_atk = lobby.stack.attacken
         counter = len(stk_atk) - 1
         if stk_atk:
-            while stk_atk[counter].ausgeführt != 1:
+            while counter >= 0:
                 atk = stk_atk[counter]
                 if atk.ausgeführt == 0:
                     atk.ausgeführt = 1
@@ -1235,7 +1235,6 @@ async def attacken_ausführen(lobby: Lobby):
                             add_wut(atk.owner, -10)
                     check_monster(lobby)
                     await check_winner(lobby)
-                if counter >= 0:
                     counter -= 1
                 else:
                     break
