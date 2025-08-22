@@ -119,7 +119,7 @@ nicht_konterbar = Keyword(name="nicht konterbar", text="Attacke kann nicht gekon
 nicht_veränderbar = Keyword(name="nicht veränderbar", text="Schaden der Attacke kann nicht verändert werden",
                             category=8)
 
-Alles_oder_nichts = Attacke(name="Alles oder nichts",
+Alles_oder_nichts = Attacke(name="",
                             text="Wähle eine deiner nicht Xmalig- und nicht Superattacken und "
                                  "entferne sie vom Spiel. Führe sie am Ende des nächsten gegnerischen Zuges "
                                  "zweimal aus",
@@ -1008,6 +1008,8 @@ async def attacken_ausführen(lobby: Lobby):
                         case "Alles oder nichts":
                             if atk.t_1 == atk.owner:
                                 dupe = replace(atk.t_atk, attacke=replace(atk.t_atk.attacke, type=2))
+                                if atk.t_atk not in opp.atk_known:
+                                    opp.atk_known.append(t_atk)
                                 attacke_zerstören(atk.t_1, atk.t_atk)
                                 l_ask = dupe.attacke.targets
                                 t_1, t_atk, t_stk, t_2 = await ask_targets(lobby,
@@ -1017,8 +1019,6 @@ async def attacken_ausführen(lobby: Lobby):
                                            event=AttackeEingesetzt(attacke=dupe.attacke, owner=atk.owner, t_1=t_1,
                                                                    t_atk=t_atk, t_stk=t_stk, t_2=t_2))
                                 opp = lobby.clients[atk.owner.spieler_id - 1].spieler
-                                if atk.t_atk not in opp.atk_known:
-                                    opp.atk_known.append(t_atk)
                                 lobby.events.append(ev)
                                 lobby.events.append(copy.deepcopy(ev))
                         case "Alles wird gut!":
