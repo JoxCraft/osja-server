@@ -631,31 +631,30 @@ def is_my_turn(lobby: Lobby, character: Spieler | Monster):
 
 
 async def execute_geheimnis(lobby: Lobby, geheimnis: Geheimnis, owner: Spieler | Monster):
-    if geheimnis in owner.stats.geheimnisse:
-        g_t = geheimnis.attacke.targets
-        t_1, t_atk, t_stk, t_2 = await ask_targets(lobby, lobby.clients[owner.spieler_id].client, g_t[0], g_t[1],
-                                                   g_t[2], g_t[3])
-        atk = AttackeEingesetzt(attacke=geheimnis.attacke, owner=owner, ausgeführt=1, t_1=t_1
-                                , t_atk=t_atk, t_stk=t_stk, t_2=t_2)
-        lobby.stack.attacken.append(atk)
-        match geheimnis.attacke.name:
-            case geheimnis1.name | geheimnis2.name:
-                await damage(lobby, 100, atk, 1)
-                await check_winner(lobby)
-                check_monster(lobby)
-            case geheimnis3.name | geheimnis4.name:
-                heilen(lobby, atk, 100)
-            case geheimnis5.name | geheimnis6.name:
-                monster(lobby, owner, 50, 50)
-            case geheimnis10.name:
-                await damage(lobby, geheimnis.mod, atk, 1)
-                await check_winner(lobby)
-                check_monster(lobby)
-            case geheimnis8.name:
-                await cst_rnd_secrt(lobby, owner)
-                await cst_rnd_secrt(lobby, owner)
-        owner.stats.ausgelöst.append(geheimnis)
-        owner.stats.geheimnisse.remove(geheimnis)
+    g_t = geheimnis.attacke.targets
+    owner.stats.ausgelöst.append(geheimnis)
+    owner.stats.geheimnisse.remove(geheimnis)
+    t_1, t_atk, t_stk, t_2 = await ask_targets(lobby, lobby.clients[owner.spieler_id].client, g_t[0], g_t[1],
+                                               g_t[2], g_t[3])
+    atk = AttackeEingesetzt(attacke=geheimnis.attacke, owner=owner, ausgeführt=1, t_1=t_1
+                            , t_atk=t_atk, t_stk=t_stk, t_2=t_2)
+    lobby.stack.attacken.append(atk)
+    match geheimnis.attacke.name:
+        case geheimnis1.name | geheimnis2.name:
+            await damage(lobby, 100, atk, 1)
+            await check_winner(lobby)
+            check_monster(lobby)
+        case geheimnis3.name | geheimnis4.name:
+            heilen(lobby, atk, 100)
+        case geheimnis5.name | geheimnis6.name:
+            monster(lobby, owner, 50, 50)
+        case geheimnis10.name:
+            await damage(lobby, geheimnis.mod, atk, 1)
+            await check_winner(lobby)
+            check_monster(lobby)
+        case geheimnis8.name:
+            await cst_rnd_secrt(lobby, owner)
+            await cst_rnd_secrt(lobby, owner)
 
 
 async def cst_rnd_secrt(lobby: Lobby, target: Spieler | Monster):
