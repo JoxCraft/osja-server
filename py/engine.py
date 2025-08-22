@@ -4,7 +4,7 @@ import random
 import copy
 
 
-@dataclass(frozen=True)
+@dataclass()
 class Geheimnis:
     attacke: Attacke
     trigger: int = 4  #0, before attack 1,after attack 2,no dmg eot 3, begin of turn 4 else
