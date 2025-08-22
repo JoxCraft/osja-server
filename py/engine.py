@@ -292,7 +292,7 @@ geheimnis3 = Attacke(name="Geheimnis - Nachdem ein Gegner dir Schaden macht, hei
                      text="Nachdem ein Gegner dir Schaden macht, heile 100 Leben",type=2,targets=[True,0,0,0])
 
 geheimnis4 = Attacke(name="Geheimnis - Wenn du im Zug eines Gegners keinen Schaden bekommst, heile 100 Leben",
-                     text="Wenn du im Zug eines Gegners keinen Schaden bekommst, heile 100Leben",type=2
+                     text="Wenn du im Zug eines Gegners keinen Schaden bekommst, heile 100 Leben",type=2
                      ,targets=[True,0,0,0])
 
 geheimnis5 = Attacke(name="Geheimnis - Nachdem du Schaden bekommst, beschwöre ein 50/50 Monster",
@@ -1100,7 +1100,7 @@ async def attacken_ausführen(lobby: Lobby):
                                 zerstöre_monster(atk.t_1)
                         case "Prestige":
                             for scrt in atk.owner.stats.ausgelöst:
-                                atk.owner.stats.geheimnisse.append(scrt)
+                                await add_secret_to_secrets(lobby,atk.owner,scrt)
                         case "Schild und Schwert":
                             await damage(lobby, 50, atk)
                             block(lobby, atk.t_stk, 50)
