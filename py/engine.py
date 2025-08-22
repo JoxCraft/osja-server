@@ -1016,11 +1016,12 @@ async def attacken_ausführen(lobby: Lobby):
                                 t_1, t_atk, t_stk, t_2 = await ask_targets(lobby,
                                                                            lobby.clients[atk.owner.spieler_id].client,
                                                                            l_ask[0], l_ask[1], l_ask[2], l_ask[3])
+                                a_e = AttackeEingesetzt(attacke=dupe.attacke, owner=atk.owner, t_1=t_1,
+                                                                   t_atk=t_atk, t_stk=t_stk, t_2=t_2)
                                 ev = Event(time=(lobby.turntime // 10) * 10 + 10,
-                                           event=AttackeEingesetzt(attacke=dupe.attacke, owner=atk.owner, t_1=t_1,
-                                                                   t_atk=t_atk, t_stk=t_stk, t_2=t_2))
+                                           event=a_e)
                                 lobby.events.append(ev)
-                                lobby.events.append(copy.deepcopy(ev))
+                                lobby.events.append(replace(ev,event=copy.deepcopy(a_e)))
                         case "Alles wird gut!":
                             resurrect(lobby, atk.owner)
                             resurrect(lobby, atk.owner)
