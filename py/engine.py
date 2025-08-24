@@ -474,10 +474,13 @@ async def passen(lobby: Lobby):
             found = False
             while not found:
                 lobby.turntime += 1
-                for event in copy.deepcopy(lobby.events):
+                triggered = []
+                for event in lobby.events:
                     if event.time == lobby.turntime:
                         lobby.stack.attacken.append(event.event)
-                        lobby.events.remove(event)
+                        triggered.append(event)
+                for event in triggered:
+                    lobby.events.remove(event)
                 await attacken_ausführen(lobby)
                 match lobby.turntime % 10:
                     case 0:
