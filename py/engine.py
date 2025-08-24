@@ -687,10 +687,10 @@ async def dmg(lobby: Lobby, target: Spieler | Monster, damg: int, owner: Spieler
             target.stats.spiegelschilder -= 1
             await damage(lobby, damg, AttackeEingesetzt(attacke=Schwertschlag, owner=owner, t_1=owner))
             damg = 0
-        elif damg > target.stats.leben and iceblock and owner.spieler_id != target.spieler_id:
+        elif damg >= target.stats.leben and iceblock and owner.spieler_id != target.spieler_id:
             damg = 0
             await execute_geheimnis(lobby, iceblock, target)
-        elif damg > target.stats.leben and target.stats.letzte_chancen > 0:
+        elif damg >= target.stats.leben and target.stats.letzte_chancen > 0:
             damg = 0
             target.stats.letzte_chancen -= 1
             heilen(lobby, AttackeEingesetzt(attacke=Heilung, owner=target, t_1=target), 50)
