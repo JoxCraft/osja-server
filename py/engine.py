@@ -56,7 +56,7 @@ class Stats:
     ausgelöst: list[Geheimnis] = field(default_factory=list)
     attacken: list[AttackeBesitz] = field(default_factory=list)
     took_dmg_this_turn: bool = False
-    letze_chancen: int = 0
+    letzte_chancen: int = 0
     spiegelschilder: int = 0
 
 
@@ -683,16 +683,16 @@ async def dmg(lobby: Lobby, target: Spieler | Monster, damg: int, owner: Spieler
             reflect.mod = damg
             damg = 0
             await execute_geheimnis(lobby, reflect, target)
-        if target.stats.spiegelschilder > 0 and owner.spieler_id != target.spieler_id:
+        elif target.stats.spiegelschilder > 0 and owner.spieler_id != target.spieler_id:
             target.stats.spiegelschilder -= 1
             await damage(lobby, damg, AttackeEingesetzt(attacke=Schwertschlag, owner=owner, t_1=owner))
             damg = 0
         elif damg > target.stats.leben and iceblock and owner.spieler_id != target.spieler_id:
             damg = 0
             await execute_geheimnis(lobby, iceblock, target)
-        elif damg > target.stats.leben and target.stats.letze_chancen > 0:
+        elif damg > target.stats.leben and target.stats.letzte_chancen > 0:
             damg = 0
-            target.stats.letze_chancen -= 1
+            target.stats.letzte_chancen -= 1
             heilen(lobby, AttackeEingesetzt(attacke=Heilung, owner=target, t_1=target), 50)
         elif onefivezero and veränderbar:
             damg = max(0, damg - 150)
@@ -1097,7 +1097,7 @@ async def attacken_ausführen(lobby: Lobby):
                         case "Lehren":
                             lehre(atk.t_1, AttackeBesitz(attacke=Schwertschlag))
                         case "Letzte Chance":
-                            atk.owner.stats.letze_chancen += 1
+                            atk.owner.stats.letzte_chancen += 1
                         case "Letzter Wille":
                             await damage(lobby, 20, atk, 5)
                         case "Meister der Magie":
