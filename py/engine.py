@@ -706,9 +706,9 @@ async def dmg(lobby: Lobby, target: Spieler | Monster, damg: int, owner: Spieler
                 target.stats.n_selbstschaden += damg
             target.stats.took_dmg_this_turn = True
             if target.is_monster:
-                check_monster(lobby,target)
+                await check_monster(lobby,target)
             else:
-                check_winner(lobby)
+                await check_winner(lobby)
             for geheimnis in after_dmg:
                 await execute_geheimnis(lobby, geheimnis, target)
 
@@ -1249,7 +1249,7 @@ async def attacken_ausführen(lobby: Lobby):
                             await cst_rnd_secrt(lobby, atk.owner)
                         case Zyklus_des_Lebens_trigger.name:
                             resurrect(lobby,atk.owner,False)
-                if counter >= 0:
+                if counter > 0:
                     counter -= 1
                 else:
                     break
