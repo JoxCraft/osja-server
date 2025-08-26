@@ -705,6 +705,10 @@ async def dmg(lobby: Lobby, target: Spieler | Monster, damg: int, owner: Spieler
             if is_my_turn(lobby, target):
                 target.stats.n_selbstschaden += damg
             target.stats.took_dmg_this_turn = True
+            if target.is_monster:
+                check_monster(lobby,target)
+            else:
+                check_winner(lobby)
             for geheimnis in after_dmg:
                 await execute_geheimnis(lobby, geheimnis, target)
 
@@ -864,23 +868,19 @@ def zerstöre_monster(monster: Monster):
     monster.stats.leben = 0
 
 
-async def check_monster(lobby: Lobby):
-    for client in lobby.clients:
-        alive = []
-        for mon in client.spieler.monster:
-            if mon.stats.leben > 0:
-                alive.append(mon)
-            else:
-                gy_ok = True
-                if not mon.stats.spott:
-                    if any(ab.attacke.name is Zyklus_des_Lebens.name for ab in client.spieler.stats.attacken):
-                        if len(client.spieler.gy) > 0:
-                            gy_ok = False
-                            lobby.stack.attacken.append(AttackeEingesetzt(attacke=Zyklus_des_Lebens_trigger,owner=client.spieler))
-                            await attacken_ausführen(lobby)
-                if gy_ok:
-                    client.spieler.gy.append(mon)
-        client.spieler.monster = alive
+async def check_monster(lobby: Lobby, monster:Monster):
+    owner = lobby.clients[monster.spieler_id].spieler
+    zyklus=False
+    if monster.stats.leben <= 0:
+        if not monster.stats.spott:
+            if any(ab.attacke.name is Zyklus_des_Lebens.name for ab in owner.stats.attacken):
+                if len(owner.gy) > 0:
+                    zyklus=True
+                    lobby.stack.attacken.append(AttackeEingesetzt(attacke=Zyklus_des_Lebens_trigger,owner=owner))
+        if zyklus:
+            await attacken_ausführen(lobby)
+        else:
+            owner.gy.append(mon)
 
 
 async def check_winner(lobby: Lobby):
@@ -1247,8 +1247,6 @@ async def attacken_ausführen(lobby: Lobby):
                             await cst_rnd_secrt(lobby, atk.owner)
                         case Zyklus_des_Lebens_trigger.name:
                             resurrect(lobby,atk.owner,False)
-                    await check_monster(lobby)
-                    await check_winner(lobby)
                 if counter >= 0:
                     counter -= 1
                 else:
