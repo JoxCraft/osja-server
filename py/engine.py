@@ -640,7 +640,6 @@ def is_my_turn(lobby: Lobby, character: Spieler | Monster):
 
 
 async def execute_geheimnis(lobby: Lobby, geheimnis: Geheimnis, owner: Spieler | Monster):
-    await attacken_ausführen(lobby)
     g_t = geheimnis.attacke.targets
     owner.stats.ausgelöst.append(geheimnis)
     owner.stats.geheimnisse.remove(geheimnis)
@@ -1235,14 +1234,14 @@ async def attacken_ausführen(lobby: Lobby):
                         case "Event - entferne Wut":
                             add_wut(atk.owner, -10)
                         case geheimnis1.name | geheimnis2.name:
-                            await damage(lobby, 100, atk, 1)
+                            await damage(lobby, 100, atk)
                             await check_winner(lobby)
                         case geheimnis3.name | geheimnis4.name:
                             heilen(lobby, atk, 100)
                         case geheimnis5.name | geheimnis6.name:
                             monster(lobby, atk.owner, 50, 50)
                         case geheimnis10.name:
-                            await damage(lobby, atk.mod, atk, 1)
+                            await damage(lobby, atk.mod, atk)
                             await check_winner(lobby)
                         case geheimnis8.name:
                             await cst_rnd_secrt(lobby, atk.owner)
