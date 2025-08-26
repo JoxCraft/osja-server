@@ -644,7 +644,7 @@ async def execute_geheimnis(lobby: Lobby, geheimnis: Geheimnis, owner: Spieler |
         old_prio = lobby.priority
         lobby.priority = owner.spieler_id
         for client in lobby.clients:
-            await client.client.message("Frage nach Zielen für " + geheimnis.name + " (" + lobby.clients[owner.spieler_id].spieler.name + ")")
+            await client.client.message("Frage nach Zielen für " + geheimnis.attacke.name + " (" + lobby.clients[owner.spieler_id].spieler.name + ")")
         g_t = geheimnis.attacke.targets
         owner.stats.ausgelöst.append(geheimnis)
         owner.stats.geheimnisse.remove(geheimnis)
