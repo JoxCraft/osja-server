@@ -640,18 +640,24 @@ def is_my_turn(lobby: Lobby, character: Spieler | Monster):
 
 
 async def execute_geheimnis(lobby: Lobby, geheimnis: Geheimnis, owner: Spieler | Monster):
-    g_t = geheimnis.attacke.targets
-    owner.stats.ausgelöst.append(geheimnis)
-    owner.stats.geheimnisse.remove(geheimnis)
-    t_1, t_atk, t_stk, t_2 = await ask_targets(
-        lobby, lobby.clients[owner.spieler_id].client, g_t[0], g_t[1], g_t[2], g_t[3]
-    )
-    atk = AttackeEingesetzt(
-        attacke=geheimnis.attacke, owner=owner,
-        t_1=t_1, t_atk=t_atk, t_stk=t_stk, t_2=t_2,mod=geheimnis.mod
-    )
-    lobby.stack.attacken.append(atk)
-    await attacken_ausführen(lobby)
+    if geheimnis in owner.stats.geheimnisse:
+        old_prio = lobby.priority
+        lobby.priority = owner.spieler_id
+        for client in lobby.clients:
+            await client.client.message("Frage nach Zielen für " + geheimnis.name + " (" + lobby.clients[owner.spieler_id].spieler.name + ")")
+        g_t = geheimnis.attacke.targets
+        owner.stats.ausgelöst.append(geheimnis)
+        owner.stats.geheimnisse.remove(geheimnis)
+        t_1, t_atk, t_stk, t_2 = await ask_targets(
+            lobby, lobby.clients[owner.spieler_id].client, g_t[0], g_t[1], g_t[2], g_t[3]
+        )
+        atk = AttackeEingesetzt(
+            attacke=geheimnis.attacke, owner=owner,
+            t_1=t_1, t_atk=t_atk, t_stk=t_stk, t_2=t_2,mod=geheimnis.mod
+        )
+        lobby.stack.attacken.append(atk)
+        lobby.priority = old_prio
+        await attacken_ausführen(lobby)
 
 
 async def cst_rnd_secrt(lobby: Lobby, target: Spieler | Monster):
@@ -672,15 +678,16 @@ async def dmg(lobby: Lobby, target: Spieler | Monster, damg: int, owner: Spieler
                     before_dmg.append(geheimnis)
                 case 1:
                     after_dmg.append(geheimnis)
-                case _:
-                    if geheimnis.attacke.name == geheimnis9.name:
-                        iceblock = geheimnis
-                    elif geheimnis.attacke.name == geheimnis10.name:
-                        reflect = geheimnis
-                    elif geheimnis.attacke.name == geheimnis7.name:
-                        onefivezero = geheimnis
         for geheimnis in before_dmg:
             await execute_geheimnis(lobby, geheimnis, target)
+        for geheimnis in target.stats.geheimnisse:
+            match geheimnis.attacke.name:
+                case geheimnis9.name:
+                    iceblock = geheimnis
+                case geheimnis10.name:
+                    reflect = geheimnis
+                case geheimnis7.name:
+                    onefivezero = geheimnis
         if reflect and owner.spieler_id != target.spieler_id:
             reflect.mod = damg
             damg = 0
@@ -745,9 +752,6 @@ async def attacke_einsetzen(lobby: Lobby, owner: Spieler | Monster, attacke: Att
                     else:
                         attacke.last_used = (time // 5 - (not is_my_turn)) * 5
                         owner.stats.atk_eingesetzt = (True, False)
-                await lobby.clients[id].client.message(
-                    "First timeslot: " + str(owner.stats.atk_eingesetzt[0]) + ", Second timeslot: " + str(
-                        owner.stats.atk_eingesetzt[1]))
                 if kein_Schaden in keys:
                     e_atk = AttackeEingesetzt(attacke=attacke.attacke, owner=owner,
                                               t_1=t_1, t_atk=t_atk, t_stk=t_stk, t_2=t_2, nodmg=True)
@@ -845,7 +849,7 @@ async def all_damage(lobby: Lobby, damage: int, attacke: AttackeEingesetzt):
 
 async def add_secret_to_secrets(lobby: Lobby, target: Spieler | Monster, secret: Geheimnis):
     await lobby.clients[target.spieler_id].client.message("Neu: " + secret.attacke.name)
-    target.stats.geheimnisse.append(secret)
+    target.stats.geheimnisse.append(copy.deepcopy(secret))
 
 
 def add_wut(target: Spieler | Monster, mod: int):
