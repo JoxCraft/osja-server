@@ -872,6 +872,7 @@ async def check_monster(lobby: Lobby, monster:Monster):
     owner = lobby.clients[monster.spieler_id].spieler
     zyklus=False
     if monster.stats.leben <= 0:
+        owner.monster.remove(monster)
         if not monster.stats.spott:
             if any(ab.attacke.name is Zyklus_des_Lebens.name for ab in owner.stats.attacken):
                 if len(owner.gy) > 0:
@@ -881,6 +882,7 @@ async def check_monster(lobby: Lobby, monster:Monster):
             await attacken_ausführen(lobby)
         else:
             owner.gy.append(mon)
+
 
 
 async def check_winner(lobby: Lobby):
