@@ -824,8 +824,8 @@ def real_damage_calc(lobby: Lobby, damage: int, attacke: AttackeEingesetzt, targ
                     for atk in mon.stats.attacken:
                         if atk.attacke is Grüne_Wiese:
                             wiesen += 1
-            return max(0, damage + owner.stats.wut + mod + lobby.atkmod - target.stats.reduction + attacke.mod - (
-                    sum(ab.attacke is Metallschild for ab in target.stats.attacken) * 10) - (wiesen * 20)) * anzahl
+            return max(0, damage + owner.stats.wut + mod + lobby.atkmod - target.stats.reduction - (
+                    sum(ab.attacke is Metallschild for ab in target.stats.attacken) * 10) - (wiesen * 20)) * anzahl + attacke.mod 
 
 
 async def damage(lobby: Lobby, damage: int, attacke: AttackeEingesetzt, anzahl: int = 1):
@@ -837,8 +837,8 @@ async def damage(lobby: Lobby, damage: int, attacke: AttackeEingesetzt, anzahl: 
 
 async def all_damage(lobby: Lobby, damage: int, attacke: AttackeEingesetzt):
     target = lobby.clients[attacke.owner.spieler_id - 1].spieler
-    damage = real_damage_calc(lobby, damage, attacke, target)
-    await dmg(lobby, target, damage, attacke.owner)
+    damg = real_damage_calc(lobby, damage, attacke, target)
+    await dmg(lobby, target, damg, attacke.owner)
     for mon in target.monster:
         damage = real_damage_calc(lobby, damage, attacke, mon)
         await dmg(lobby, mon, damage, attacke.owner)
@@ -874,14 +874,14 @@ async def check_monster(lobby: Lobby, monster:Monster):
     if monster.stats.leben <= 0:
         owner.monster.remove(monster)
         if not monster.stats.spott:
-            if any(ab.attacke.name is Zyklus_des_Lebens.name for ab in owner.stats.attacken):
+            if any(ab.attacke.name == Zyklus_des_Lebens.name for ab in owner.stats.attacken):
                 if len(owner.gy) > 0:
                     zyklus=True
                     lobby.stack.attacken.append(AttackeEingesetzt(attacke=Zyklus_des_Lebens_trigger,owner=owner))
         if zyklus:
             await attacken_ausführen(lobby)
         else:
-            owner.gy.append(mon)
+            owner.gy.append(monster)
 
 
 
