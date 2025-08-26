@@ -824,7 +824,7 @@ def real_damage_calc(lobby: Lobby, damage: int, attacke: AttackeEingesetzt, targ
                         if atk.attacke is Grüne_Wiese:
                             wiesen += 1
             return max(0, damage + owner.stats.wut + mod + lobby.atkmod - target.stats.reduction - (
-                    sum(ab.attacke is Metallschild for ab in target.stats.attacken) * 10) - (wiesen * 20)) * anzahl + attacke.mod 
+                    sum(ab.attacke is Metallschild for ab in target.stats.attacken) * 10) - (wiesen * 20)) * anzahl + attacke.mod
 
 
 async def damage(lobby: Lobby, damage: int, attacke: AttackeEingesetzt, anzahl: int = 1):
@@ -1241,7 +1241,7 @@ async def attacken_ausführen(lobby: Lobby):
                         case geheimnis5.name | geheimnis6.name:
                             monster(lobby, atk.owner, 50, 50)
                         case geheimnis10.name:
-                            await damage(lobby, atk.mod, atk)
+                            await damage(lobby, 0, atk)
                             await check_winner(lobby)
                         case geheimnis8.name:
                             await cst_rnd_secrt(lobby, atk.owner)
