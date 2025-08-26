@@ -22,6 +22,7 @@ def _player_id_by_name(lobby: eng.Lobby, player_name: str) -> int:
         if c.spieler.name == player_name:
             return c.spieler.spieler_id
     raise RuntimeError(f"player not found: {player_name!r}")
+
 # --- Resolver relativ zur Besitzer-Perspektive (owner_id) ---
 def _resolve_char_rel(lobby: eng.Lobby, owner_id: int, sel: dict):
     side = sel.get("side")
@@ -93,11 +94,8 @@ class PyClient:
         try:
             idx = int(idx)
         except Exception:
-            pass
+            idx = None
         return idx
-
-
-
 
 # --- benutze PyClient beim Beitritt ---
 async def spieler_beitreten_py(lobby_code: str, spielername: str, js_client):
@@ -226,15 +224,13 @@ async def ui_rematch(lobby_code: str):
 
     # Reset/Init
     global _paid
-    _paid.clear()
+    _paid.pop(lobby_code, None)  # nur diese Lobby leeren (per-Lobby Store)
     _ensure_tmp(new_lobby)
     _ensure_draw_field(new_lobby)
     new_lobby.winner = None
     new_lobby.phase = 0  # führt im Snapshot zu screen=1 (Attackenwahl)
 
     return True
-
-
 
 # ---------- Pools ----------
 def _attack_type_counts():
@@ -274,7 +270,9 @@ def get_pool(lobby_code:str, phase:int, rangeleien:bool=False):
 
 # ---------- Auswahl & Phasen ----------
 _selected = {}
-_paid = {}
+
+# per-Lobby Zahlungen, um Kollisionen bei gleichen Namen oder mehreren Lobbies zu vermeiden
+_paid: dict[str, dict[str, int]] = {}
 
 def submit_attacks(lobby_code: str, player_name: str, picks: list[str], rangeleien: bool = False):
     lobby = get_lobby(lobby_code)
@@ -328,24 +326,21 @@ def set_flags(lobby_code: str, player_name: str, start: bool, end: bool, react: 
     
 async def submit_pay(lobby_code: str, player_name: str, amount: int, **kwargs):
     lobby = get_lobby(lobby_code)
-    c = _client_by_name(lobby, player_name)
+    _paid_for_lobby = _paid.setdefault(lobby_code, {})
 
     # Source of truth: clamp + auf /5 abrunden
     amt = max(0, int(amount))
     amt = (amt // 5) * 5
 
-    _paid[player_name] = amt
-    if len(lobby.clients) == 2 and all(n in _paid for n in (lobby.clients[0].spieler.name, lobby.clients[1].spieler.name)):
+    _paid_for_lobby[player_name] = amt
+    if len(lobby.clients) == 2 and all(n in _paid_for_lobby for n in (lobby.clients[0].spieler.name, lobby.clients[1].spieler.name)):
         await eng.leben_zahlen(
             lobby,
-            lobby.clients[0], _paid[lobby.clients[0].spieler.name],
-            lobby.clients[1], _paid[lobby.clients[1].spieler.name]
+            lobby.clients[0], _paid_for_lobby[lobby.clients[0].spieler.name],
+            lobby.clients[1], _paid_for_lobby[lobby.clients[1].spieler.name]
         )
-        _paid.clear()
+        _paid.pop(lobby_code, None)  # nur diese Lobby zurücksetzen
     return True
-
-
-
 
 # ---------- UI-Aktionen Kampf ----------
 async def ui_pass(lobby_code: str, player_name: str):
@@ -355,7 +350,6 @@ async def ui_pass(lobby_code: str, player_name: str):
         await eng.passen(lobby)  # <<< WICHTIG: await
         return True
     return False
-
 
 def _resolve_char(lobby: eng.Lobby, desc: dict):
     side = desc.get("side")
@@ -417,8 +411,6 @@ async def ui_play(lobby_code:str, player_name:str, char:dict, ab_id:int):
     await eng.attacke_gewählt(lobby, owner, ab)
     return True
 
-
-
 # ---------- Snapshot ----------
 def _ser_keywords(ab: eng.AttackeBesitz):
     seen = set()
@@ -462,12 +454,12 @@ def _ser_player_extra(sp: eng.Spieler):
 
 def _ser_player(sp: eng.Spieler):
     data = _ser_member(sp.name, sp.stats, True)
+    data["player_id"] = sp.spieler_id  # <<< added for robust me/opp mapping on the client
     data["monsters"] = [_ser_member(f"Monster {i+1}", m.stats, False) for i, m in enumerate(sp.monster)]
     data["known"] = [_ser_attackebesitz_full(ab) for ab in sp.atk_known]   # 1:1 known
     data["flags"] = { "start": bool(sp.stop_start), "end": bool(sp.stop_end), "react": bool(sp.stop_react) }
     data["extra"] = _ser_player_extra(sp)
     return data
-
 
 def _char_label(lobby: eng.Lobby, ch: eng.Spieler | eng.Monster | None) -> str:
     if ch is None:
@@ -505,7 +497,6 @@ def _stack_target_label(lobby: eng.Lobby, e: eng.AttackeEingesetzt):
         labels.append(f"Ziel 2: {_char_label(lobby, e.t_2)}")
     return labels
 
-
 def lobby_snapshot(lobby: eng.Lobby | str):
     # Falls nur der Code übergeben wird, die echte Lobby holen
     if isinstance(lobby, str):
@@ -540,7 +531,6 @@ def lobby_snapshot(lobby: eng.Lobby | str):
     }
 
     # Stack-Items mit Ziel-Labels
-    # Stack-Items mit Ziel-Labels
     for idx, e in enumerate(lobby.stack.attacken):
         owner_player = lobby.clients[e.owner.spieler_id].spieler.name if len(lobby.clients) > e.owner.spieler_id else "?"
         owner_label = _char_label(lobby, e.owner)  # e.g. "Katrin – Monster 2" or "Katrin"
@@ -548,19 +538,18 @@ def lobby_snapshot(lobby: eng.Lobby | str):
         state["stack"].append({
             "index": idx,
             "name": e.attacke.name,
-            "owner": owner_label,          # <<< nice label for UI
-            "owner_player": owner_player,  # <<< raw player for color logic
+            "owner": owner_label,          # nice label for UI
+            "owner_player": owner_player,  # raw player for color logic
             "atype": atype,
             "targets": _stack_target_label(lobby, e),
         })
-
 
     # Players vollständig serialisieren
     for i in range(len(lobby.clients)):
         sp = lobby.clients[i].spieler
         state["players"].append(_ser_player(sp))
 
-    # Winner & Draw-OFFER  <<< außerhalb der Schleife!
+    # Winner & Draw-OFFER
     state["winner"] = getattr(lobby, "winner", None)
     _ensure_draw_field(lobby)
     if lobby._draw_offer is None:
@@ -572,6 +561,3 @@ def lobby_snapshot(lobby: eng.Lobby | str):
             state["draw_offer_by"] = None
 
     return state
-
-
-
