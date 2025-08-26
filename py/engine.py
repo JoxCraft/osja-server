@@ -864,8 +864,9 @@ def ist_konterbar(attacke: Attacke):
         return True
 
 
-def zerstöre_monster(monster: Monster):
+async def zerstöre_monster(lobby:Lobby,monster: Monster):
     monster.stats.leben = 0
+    await check_monster(lobby,monster)
 
 
 async def check_monster(lobby: Lobby, monster:Monster):
@@ -1114,8 +1115,7 @@ async def attacken_ausführen(lobby: Lobby):
                                 leben = atk.t_1.stats.leben
                                 sp = lobby.clients[atk.owner.spieler_id].spieler
                                 erhalte_leben(sp, leben)
-                                zerstöre_monster(atk.t_1)
-                                await check_monster(lobby)
+                                await zerstöre_monster(lobby,atk.t_1)
                                 for mon in sp.monster:
                                     erhalte_leben(mon, leben)
                         case "Prestige":
