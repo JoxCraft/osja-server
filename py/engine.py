@@ -365,6 +365,9 @@ async def ask_targets(lobby: Lobby, client, t_1: bool = False, t_atk: bool = Fal
     a, b, c, d = None, None, None, None
     if t_atk:
         a, b = await client.getatktarget()
+        if a == lobby.clients[lobby.priority].spieler:
+            if b not in lobby.clients[lobby.priority-1].spieler.atk_known:
+                lobby.clients[lobby.priority - 1].spieler.atk_known.append(b)
     elif t_1:
         a = await client.getcharactertarget()
     if t_stk:
@@ -937,8 +940,9 @@ def konter(lobby: Lobby, target: int):
             atk.ausgeführt = 2
 
 
-def lehre(target1: Spieler | Monster, target2: AttackeBesitz):
-    target1.stats.attacken.append(copy.deepcopy(target2))
+def lehre(target1: Spieler | Monster, target2: Attacke):
+    atk = AttackeBesitz(attacke=target2)
+    target1.stats.attacken.append(copy.deepcopy(atk))
 
 
 def erhalte_leben(target: Spieler | Monster, mod):
@@ -1004,9 +1008,6 @@ async def attacken_ausführen(lobby: Lobby):
                         case "Alles oder nichts":
                             if atk.t_1 == atk.owner:
                                 dupe = replace(atk.t_atk, attacke=replace(atk.t_atk.attacke, type=2))
-                                opp = lobby.clients[atk.owner.spieler_id - 1].spieler
-                                if atk.t_atk not in opp.atk_known:
-                                    opp.atk_known.append(atk.t_atk)
                                 attacke_zerstören(atk.t_1, atk.t_atk)
                                 l_ask = dupe.attacke.targets
                                 t_1, t_atk, t_stk, t_2 = await ask_targets(lobby,
@@ -1091,11 +1092,11 @@ async def attacken_ausführen(lobby: Lobby):
                                     if key.category <= 1:
                                         okay = False
                                 if okay:
-                                    lehre(atk.t_2, atk.t_atk)
+                                    lehre(atk.t_2, atk.t_atk.attacke)
                                     if atk.t_atk not in lobby.clients[atk.owner.spieler_id - 1].spieler.atk_known:
                                         lobby.clients[atk.owner.spieler_id - 1].spieler.atk_known.append(atk.t_atk)
                         case "Lehren":
-                            lehre(atk.t_1, AttackeBesitz(attacke=Schwertschlag))
+                            lehre(atk.t_1, Schwertschlag)
                         case "Letzte Chance":
                             atk.owner.stats.letzte_chancen += 1
                         case "Letzter Wille":
