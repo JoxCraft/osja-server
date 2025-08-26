@@ -1125,12 +1125,12 @@ async def attacken_ausführen(lobby: Lobby):
                             await damage(lobby, 50, atk)
                             block(lobby, atk.t_stk, 50)
                         case "Schnell":
-                            end_time = ((lobby.turntime + 1) // 5) * 5 + 4
+                            end_time = ((lobby.turntime + 1) // 5) * 5 + 3
                             lobby.events.append(
                                 Event(end_time, AttackeEingesetzt(attacke=erhalte_Schnell, owner=atk.owner,
                                                                   t_atk=atk.t_atk)))
                             lobby.events.append(
-                                Event(end_time + 1, AttackeEingesetzt(attacke=entferne_Schnell, owner=atk.owner,
+                                Event(end_time + 2, AttackeEingesetzt(attacke=entferne_Schnell, owner=atk.owner,
                                                                       t_atk=atk.t_atk)))
                         case "Schneller":
                             add_key(Schnell, atk.t_atk)
