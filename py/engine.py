@@ -164,7 +164,7 @@ Lebender_Schild = Attacke(name="Lebender Schild", text="Wähle einen Charakter. 
                           keywords=[], type=0, targets=[True, 0, 0, 0])
 Lebenslehre = Attacke(name="Lebenslehre", text="Verleihe einem Monster eine deiner nicht Xmalig- nicht Superattacken",
                       keywords=[], type=0, targets=[True, True, 0, True])
-Lehren = Attacke(name="Lehren", text="Verleihe einem Charakter die Attacke Schwertschalag", keywords=[], type=0,
+Lehren = Attacke(name="Lehren", text="Verleihe einem Charakter die Attacke Schwertschlag", keywords=[], type=0,
                  targets=[True, 0, 0, 0])
 Letzte_Chance = Attacke(name="Letzte Chance",
                         text="Wenn du das nächste Mal tödlichen Schaden bekommen würdest, negiere jenen Schaden und "
@@ -308,7 +308,7 @@ geheimnis7 = Attacke(name="Geheimnis - Wenn du Schaden bekommen würdest, verhin
                      text="Wenn du Schaden bekommen würdest, verhindere 150 des Schadens", type=2)
 
 geheimnis8 = Attacke(name="Geheimnis - Erhalte zu beginn deines Zuges zwei zufällige Geheimnissen",
-                     text="Wähle zu Beginn deines Zuges erhalte zwei zufällige Geheimnissen", type=2)
+                     text="Wähle zu Beginn deines Zuges erhalte zwei zufällige Geheimnisse", type=2)
 
 geheimnis9 = Attacke(name="Geheimnis - Wenn ein Gegner dir tödlichen Schaden machen würde, verhindere jenen Schaden",
                      text="Wenn ein Gegner dir tödlichen Schaden machen würde, verhindere jenen Schade", type=2)
@@ -704,12 +704,12 @@ async def dmg(lobby: Lobby, target: Spieler | Monster, damg: int, owner: Spieler
             if is_my_turn(lobby, target):
                 target.stats.n_selbstschaden += damg
             target.stats.took_dmg_this_turn = True
+            for geheimnis in after_dmg:
+                await execute_geheimnis(lobby, geheimnis, target)
             if target.is_monster:
                 await check_monster(lobby,target)
             else:
                 await check_winner(lobby)
-            for geheimnis in after_dmg:
-                await execute_geheimnis(lobby, geheimnis, target)
 
 
 def get_rnd_secrt(end: int = len(all_geheimnisse)):
