@@ -942,7 +942,7 @@ def konter(lobby: Lobby, target: int):
 
 def lehre(target1: Spieler | Monster, target2: Attacke):
     atk = AttackeBesitz(attacke=target2)
-    target1.stats.attacken.append(copy.deepcopy(atk))
+    target1.stats.attacken.append(atk)
 
 
 def erhalte_leben(target: Spieler | Monster, mod):
