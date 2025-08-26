@@ -16,6 +16,9 @@ let lastState = null;
 
 let syncingFlags = false;
 
+// simple mutex to avoid double host-create races
+let creating = false;
+
 function readFlagsFromUI() {
   const onFight = (screen === 3); // nur Screen 3 hat die *-3 Inputs „aktiv“ gedacht
   const s = onFight ? !!ui.cbStart3?.checked : !!ui.cbStart?.checked;
@@ -23,7 +26,6 @@ function readFlagsFromUI() {
   const r = onFight ? !!ui.cbReact3?.checked : !!ui.cbReact?.checked;
   return { start: s, end: e, react: r };
 }
-
 
 async function pushFlagsToServer() {
   const { start, end, react } = readFlagsFromUI();
@@ -36,7 +38,6 @@ async function pushFlagsToServer() {
     await rpcAskHost("set_flags", { name: localName, start, end, react });
   }
 }
-
 
 const ui = {
   screens: [...document.querySelectorAll('.screen')],
@@ -80,7 +81,6 @@ const ui = {
   summary: document.getElementById('summary'),
   rematchBtn: document.getElementById('rematch-btn'),
 };
-
 
 // Error Logging
 window.addEventListener("unhandledrejection", (e) => {
@@ -174,6 +174,27 @@ async function initAbly(lobbyCode, name) {
   channel.subscribe("host-set", (msg) => {
     hostId = msg.data.hostId;
     isHost = (hostId === clientId);
+  });
+
+  // Attempt a simple host re-election if host leaves
+  presence.subscribe('leave', async () => {
+    try {
+      const m = await presence.get();
+      const currentHost = m.find(x => x.data?.isHost);
+      if (!currentHost) {
+        const winner = [...m].sort((a,b)=>String(a.clientId).localeCompare(String(b.clientId)))[0];
+        if (winner?.clientId === clientId) {
+          isHost = true; hostId = clientId;
+          await presence.update({ name: localName, isHost: true });
+          await channel.publish("host-set", { hostId: clientId });
+          if (!pyReady) {
+            await loadPyodideAndEngine();
+          }
+        }
+      }
+    } catch (e) {
+      console.error("host re-election failed", e);
+    }
   });
 
   // Pool-Rendering (vom Host oder spezifisch per RPC geliefert)
@@ -273,10 +294,38 @@ const Host = {
   mkLocalClient() {
     return {
       // NUR lokal loggen (kein Broadcast)
-      message: async (text) => { log(text); },
-      getcharactertarget: async () => selectCharacterTarget(),
-      getatktarget: async () => selectAttackTarget(),
-      getstacktarget: async () => selectStackTarget(),
+      message: async (text) => {
+        log(text);
+        // create & broadcast a fresh snapshot after every engine message
+        try {
+          const snap = await Host.snapshot();
+          await broadcast("state", { ...snap, force: true });
+        } catch (e) {
+          console.error("snapshot after message failed", e);
+        }
+      },
+      getcharactertarget: async () => {
+        // optional: ensure UI re-renders before selection starts
+        try {
+          const snap = await Host.snapshot();
+          await broadcast("state", { ...snap, force: true });
+        } catch {}
+        return selectCharacterTarget();
+      },
+      getatktarget: async () => {
+        try {
+          const snap = await Host.snapshot();
+          await broadcast("state", { ...snap, force: true });
+        } catch {}
+        return selectAttackTarget();
+      },
+      getstacktarget: async () => {
+        try {
+          const snap = await Host.snapshot();
+          await broadcast("state", { ...snap, force: true });
+        } catch {}
+        return selectStackTarget();
+      },
       win: async () => { await broadcast("state", await Host.snapshot()); }
     };
   },
@@ -286,6 +335,13 @@ const Host = {
       message: async (text) => {
         // einseitige Nachricht an remoteId
         await channel.publish("rpc", { to: remoteId, op: "notify", data: { text }, reqId: null });
+        // and also snapshot for everyone
+        try {
+          const snap = await Host.snapshot();
+          await broadcast("state", { ...snap, force: true });
+        } catch (e) {
+          console.error("snapshot after message (remote) failed", e);
+        }
       },
       getcharactertarget: async () => Host.rpcAsk(remoteId, "getchar"),
       getatktarget: async () => Host.rpcAsk(remoteId, "getatk"),
@@ -375,36 +431,40 @@ function renderState(state) {
   showScreen(state.screen);
 
   if (state.screen >= 3 || state.screen === 2) {
-    ui.turnNum.textContent = state.turn;
+    ui.turnNum.textContent = Math.max(0, state.turn);
     ui.turnPhase.textContent = phaseLabel(state.turntime, state.reaction);
     ui.priorityName.textContent = state.priority_name || "-";
   }
 
   // Stack
-  // Stack
-if (state.stack) {
-  ui.stackView.innerHTML = state.stack.map(it => {
-    // color by player, show detailed owner label
-    const colorClass = (it.atype === 2)
-      ? "blue"
-      : (it.owner_player === localName ? "green" : "red");
+  if (state.stack) {
+    ui.stackView.innerHTML = state.stack.map(it => {
+      // color by player, show detailed owner label
+      const colorClass = (it.atype === 2)
+        ? "blue"
+        : (it.owner_player === localName ? "green" : "red");
 
-    return `
-      <div class="item ${colorClass}" data-stack-index="${it.index}">
-        <div><strong>${it.name}</strong> (${it.owner})</div>
-        ${it.targets.map(t => `<div class="small">• ${t}</div>`).join("")}
-      </div>
-    `;
-  }).join("");
-}
+      return `
+        <div class="item ${colorClass}" data-stack-index="${it.index}">
+          <div><strong>${it.name}</strong> (${it.owner})</div>
+          ${it.targets.map(t => `<div class="small">• ${t}</div>`).join("")}
+        </div>
+      `;
+    }).join("");
+  }
 
-
-
-  // Spieler nach Namen mappen
+  // Spieler nach stabiler ID (fallback: Name)
   let my = null, opp = null;
   if (Array.isArray(state.players)) {
-    my = state.players.find(p => p.name === localName) || state.players[0] || null;
-    opp = state.players.find(p => p.name !== (my && my.name)) || null;
+    const meByName = state.players.find(p => p.name === localName) || null;
+    if (state.players.some(p => typeof p.player_id === "number")) {
+      const mePid = meByName?.player_id ?? 0;
+      my  = state.players.find(p => p.player_id === mePid) || null;
+      opp = state.players.find(p => p.player_id !== mePid) || null;
+    } else {
+      my  = meByName || state.players[0] || null;
+      opp = state.players.find(p => p.name !== (my && my.name)) || null;
+    }
   }
 
   // Teams rendern
@@ -437,65 +497,63 @@ if (state.stack) {
   `;
 
   if (selectedChar && selectedChar.side === "opp") {
-  if (selectedChar.kind === "player") {
-    // Beim Klick auf den GEGNERISCHEN SPIELER: known anzeigen
-    ui.rightTitle.textContent = "Bekannte gegnerische Attacken";
-    const known = (my && my.known) ? my.known : [];
-    ui.charAttacks.innerHTML = known.map(a => fmtAtk(a)).join("");
-  } else {
-    // Beim Klick auf ein GEGNERISCHES MONSTER: dessen Attacken direkt zeigen
-    ui.rightTitle.textContent = "Gegnerisches Monster – Attacken";
-    const oppPlayer = (state.players || []).find(p => p.name !== localName) || null;
-    const list = oppPlayer?.monsters?.[selectedChar.index]?.attacks || [];
+    if (selectedChar.kind === "player") {
+      // Beim Klick auf den GEGNERISCHEN SPIELER: known anzeigen
+      ui.rightTitle.textContent = "Bekannte gegnerische Attacken";
+      const known = (my && my.known) ? my.known : [];
+      ui.charAttacks.innerHTML = known.map(a => fmtAtk(a)).join("");
+    } else {
+      // Beim Klick auf ein GEGNERISCHES MONSTER: dessen Attacken direkt zeigen
+      ui.rightTitle.textContent = "Gegnerisches Monster – Attacken";
+      const oppPlayer = (state.players || []).find(p =>
+        (typeof p.player_id === "number")
+          ? (p.player_id !== (my?.player_id ?? -1))
+          : (p.name !== localName)
+      ) || null;
+      const list = oppPlayer?.monsters?.[selectedChar.index]?.attacks || [];
+      ui.charAttacks.innerHTML = list.map((a,i)=>fmtAtk(a,i)).join("");
+    }
+  } else if (selectedChar && selectedChar.side === "me" && my) {
+    // Eigene Auswahl: wie gehabt
+    const list = (selectedChar.kind === "player")
+      ? (my.attacks || [])
+      : ((my.monsters?.[selectedChar.index]?.attacks) || []);
     ui.charAttacks.innerHTML = list.map((a,i)=>fmtAtk(a,i)).join("");
+  } else {
+    // Nichts ausgewählt – leer lassen
+    ui.charAttacks.innerHTML = "";
   }
-} else if (selectedChar && selectedChar.side === "me" && my) {
-  // Eigene Auswahl: wie gehabt
-  const list = (selectedChar.kind === "player")
-    ? (my.attacks || [])
-    : ((my.monsters?.[selectedChar.index]?.attacks) || []);
-  ui.charAttacks.innerHTML = list.map((a,i)=>fmtAtk(a,i)).join("");
-} else {
-  // Nichts ausgewählt – leer lassen
-  ui.charAttacks.innerHTML = "";
-}
 
-
-  // Screen 2: bekannte Gegner-Attacken
-// Screen 2: bekannte Gegner-Attacken (render)
-if (state.screen === 2) {
-  // "my" is your own player from the snapshot
-  const my = (state.players || []).find(p => p.name === localName) || null;
-  const known = my?.known || [];
-  ui.oppKnown.innerHTML = known.length
-    ? known.map(a => `
-        <div class="atk">
-          <div><strong>${a.name}</strong></div>
-          <div class="small">${(a.keywords || []).join(", ")}</div>
-          <div class="small">${a.text}</div>
-        </div>
-      `).join("")
-    : `<div class="small">— noch nichts bekannt —</div>`;
-}
-
-  
+  // Screen 2: bekannte Gegner-Attacken (render)
+  if (state.screen === 2) {
+    const myP = (state.players || []).find(p => p.name === localName) || null;
+    const known = myP?.known || [];
+    ui.oppKnown.innerHTML = known.length
+      ? known.map(a => `
+          <div class="atk">
+            <div><strong>${a.name}</strong></div>
+            <div class="small">${(a.keywords || []).join(", ")}</div>
+            <div class="small">${a.text}</div>
+          </div>
+        `).join("")
+      : `<div class="small">— noch nichts bekannt —</div>`;
+  }
 
   // Flags (Screen 2 & 3) spiegeln
-if (my && my.flags) {
-  syncingFlags = true;
-  try {
-    if (ui.cbStart)  ui.cbStart.checked  = !!my.flags.start;
-    if (ui.cbEnd)    ui.cbEnd.checked    = !!my.flags.end;
-    if (ui.cbReact)  ui.cbReact.checked  = !!my.flags.react;
+  if (my && my.flags) {
+    syncingFlags = true;
+    try {
+      if (ui.cbStart)  ui.cbStart.checked  = !!my.flags.start;
+      if (ui.cbEnd)    ui.cbEnd.checked    = !!my.flags.end;
+      if (ui.cbReact)  ui.cbReact.checked  = !!my.flags.react;
 
-    if (ui.cbStart3) ui.cbStart3.checked = !!my.flags.start;
-    if (ui.cbEnd3)   ui.cbEnd3.checked   = !!my.flags.end;
-    if (ui.cbReact3) ui.cbReact3.checked = !!my.flags.react;
-  } finally {
-    setTimeout(()=>{ syncingFlags = false; }, 0);
+      if (ui.cbStart3) ui.cbStart3.checked = !!my.flags.start;
+      if (ui.cbEnd3)   ui.cbEnd3.checked   = !!my.flags.end;
+      if (ui.cbReact3) ui.cbReact3.checked = !!my.flags.react;
+    } finally {
+      setTimeout(()=>{ syncingFlags = false; }, 0);
+    }
   }
-}
-
 
   // Buttons en/disablen
   if (state.screen >= 3 && state.priority_name) {
@@ -510,7 +568,7 @@ if (my && my.flags) {
     ui.payInput.max = String(max);
   }
 
-    // Winner Screen
+  // Winner Screen
   if (state.screen === 4) {
     const w = state.winner || "-";
     ui.winner.textContent = (w === "Tie") ? "Unentschieden" : `Sieger: ${w}`;
@@ -529,7 +587,7 @@ if (my && my.flags) {
     ui.summary.innerHTML = lines || "";
   }
 
-    // Draw-Button Status-Text
+  // Draw-Button Status-Text
   if (ui.drawBtn) {
     const by = state.draw_offer_by || null;
     if (!by) {
@@ -543,8 +601,6 @@ if (my && my.flags) {
       ui.drawBtn.disabled = false;
     }
   }
-
-
 }
 
 function renderPool(attacks) {
@@ -594,25 +650,27 @@ ui.joinBtn.addEventListener('click', async () => {
 });
 
 // ==============================
-// RPC helper (client -> host)
+// RPC helper (client -> host) with timeout
 // ==============================
-async function rpcAskHost(op, data = {}) {
-  return new Promise(async (resolve) => {
+async function rpcAskHost(op, data = {}, timeoutMs = 12000) {
+  return new Promise(async (resolve, reject) => {
     const reqId = Math.random().toString(36).slice(2);
     const handler = (msg) => {
       if (msg.data.reqId === reqId) {
         channel.unsubscribe("rpc-resp", handler);
+        clearTimeout(t);
         resolve(msg.data.res);
       }
     };
     channel.subscribe("rpc-resp", handler);
     await channel.publish("rpc", { to: hostId, op, data, reqId });
+    const t = setTimeout(() => {
+      channel.unsubscribe("rpc-resp", handler);
+      reject(new Error(`RPC ${op} timed out`));
+    }, timeoutMs);
   });
 }
 
-// ==============================
-// Screen 1 – Attackenwahl
-// ==============================
 // ==============================
 // Screen 1 – Attackenwahl (FIXED)
 // ==============================
@@ -707,9 +765,6 @@ ui.confirmPicks.addEventListener('click', async () => {
 // ==============================
 // Screen 2 – Leben zahlen + Flags
 // ==============================
-// Beide Checkbox-Sets (Screen 2 & 3) einheitlich behandeln (NEU) 2
-
-
 ui.payConfirm.addEventListener('click', async ()=>{
   if (ui.payConfirm.disabled) return; // extra safety
   ui.payConfirm.disabled = true;
@@ -747,8 +802,6 @@ ui.payConfirm.addEventListener('click', async ()=>{
     ui.payConfirm.disabled = false;
   }
 });
-
-
 
 // ==============================
 // Screen 3 – Kampfsteuerung
@@ -850,9 +903,7 @@ ui.rematchBtn?.addEventListener('click', async ()=>{
   }
 });
 
-
 // Kampf-Checkboxen (Screen 3)
-
 // Beide Checkbox-Sets (Screen 2 & 3) einheitlich behandeln
 [ui.cbStart, ui.cbEnd, ui.cbReact, ui.cbStart3, ui.cbEnd3, ui.cbReact3]
   .filter(Boolean)
@@ -862,7 +913,6 @@ ui.rematchBtn?.addEventListener('click', async ()=>{
       await pushFlagsToServer();
     });
   });
-
 
 // ==============================
 // RPC handler (nicht-Host Eingaben, Host führt Python aus)
@@ -899,7 +949,7 @@ async function handleRpc(op, data) {
       await broadcast("state", { ...snap, force: true });
       return ok;
     }
-        case "resign": {
+    case "resign": {
       await Host.call("ui_resign", { lobby_code: lobbyCodeVal, player_name: data.name });
       const snap = await Host.snapshot();
       await broadcast("state", { ...snap, force: true });
@@ -993,7 +1043,6 @@ function leaveSelectionMode() {
   ui.playBtn.classList.remove("hidden");
 }
 
-
 async function selectCharacterTarget(){
   return new Promise(resolve => {
     enterSelectionMode("Ziel wählen");
@@ -1081,7 +1130,6 @@ async function selectAttackTarget(){
   });
 }
 
-
 async function selectStackTarget(){
   return new Promise(resolve => {
     enterSelectionMode("Ziel wählen");
@@ -1090,8 +1138,8 @@ async function selectStackTarget(){
     const onPick = (e) => {
       const el = e.target.closest(".item");
       if (!el) return;
-      ui.stackView.querySelectorAll(".item").forEach(x=>x.classList.remove("selected"));
-      el.classList.add("selected");
+      ui.stackView.querySelectorAll(".item").forEach(x=>x.classList.remove('selected'));
+      el.classList.add('selected');
       idx = parseInt(el.getAttribute("data-stack-index"), 10);
       selection.confirmBtn.disabled = (isNaN(idx));
     };
@@ -1099,7 +1147,7 @@ async function selectStackTarget(){
 
     const onConfirm = () => {
       ui.stackView.removeEventListener("click", onPick);
-      const val = Number.isInteger(idx) ? idx : 0;
+      const val = Number.isInteger(idx) ? idx : null; // don't default to 0
       leaveSelectionMode();
       resolve(val);
     };
@@ -1107,12 +1155,14 @@ async function selectStackTarget(){
   });
 }
 
-
 // ==============================
 // Host ensure + initial pool
 // ==============================
 async function ensureHostReadyAndCreate(lobbyCode, meName, otherName, otherId) {
   try {
+    if (creating || lobbyCreated) return;
+    creating = true;
+
     if (!pyReady) {
       log("[Host] Lade Pyodide & Engine…");
       await loadPyodideAndEngine();
@@ -1156,6 +1206,8 @@ json.dumps({"attack_count": sum(1 for v in eng.__dict__.values() if isinstance(v
     console.error("ensureHostReadyAndCreate failed:", outer);
     if (outer && outer.message) console.error(outer.message);
     throw outer;
+  } finally {
+    creating = false;
   }
 }
 
