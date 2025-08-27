@@ -308,7 +308,7 @@ geheimnis7 = Attacke(name="Geheimnis - Wenn du Schaden bekommen würdest, verhin
                      text="Wenn du Schaden bekommen würdest, verhindere 150 des Schadens", type=2)
 
 geheimnis8 = Attacke(name="Geheimnis - Erhalte zu beginn deines Zuges zwei zufällige Geheimnissen",
-                     text="Wähle zu Beginn deines Zuges erhalte zwei zufällige Geheimnisse", type=2)
+                     text="Wähle zu Beginn deines Zuges erhalte ein zufälliges Geheimnis", type=2)
 
 geheimnis9 = Attacke(name="Geheimnis - Wenn ein Gegner dir tödlichen Schaden machen würde, verhindere jenen Schaden",
                      text="Wenn ein Gegner dir tödlichen Schaden machen würde, verhindere jenen Schade", type=2)
@@ -1244,16 +1244,13 @@ async def attacken_ausführen(lobby: Lobby):
                             add_wut(atk.owner, -10)
                         case geheimnis1.name | geheimnis2.name:
                             await damage(lobby, 100, atk)
-                            await check_winner(lobby)
                         case geheimnis3.name | geheimnis4.name:
                             heilen(lobby, atk, 100)
                         case geheimnis5.name | geheimnis6.name:
                             monster(lobby, atk.owner, 50, 50)
                         case geheimnis10.name:
                             await damage(lobby, 0, atk)
-                            await check_winner(lobby)
                         case geheimnis8.name:
-                            await cst_rnd_secrt(lobby, atk.owner)
                             await cst_rnd_secrt(lobby, atk.owner)
                         case Zyklus_des_Lebens_trigger.name:
                             resurrect(lobby,atk.owner,False)
