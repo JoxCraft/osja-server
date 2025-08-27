@@ -694,7 +694,8 @@ async def dmg(lobby: Lobby, target: Spieler | Monster, damg: int, owner: Spieler
             await execute_geheimnis(lobby, reflect, target)
         elif target.stats.spiegelschilder > 0 and owner.spieler_id != target.spieler_id:
             target.stats.spiegelschilder -= 1
-            await damage(lobby, damg, AttackeEingesetzt(attacke=Schwertschlag, owner=owner, t_1=owner))
+            if not any(ab.attacke.name == Spiegelschild.name and kein_Schaden in ab.x_keywords  for ab in target.stats.attacken):
+                await damage(lobby, damg, AttackeEingesetzt(attacke=Schwertschlag, owner=owner, t_1=owner))
             damg = 0
         elif damg >= target.stats.leben and iceblock and owner.spieler_id != target.spieler_id:
             damg = 0
