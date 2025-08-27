@@ -844,7 +844,10 @@ async def all_damage(lobby: Lobby, damage: int, attacke: AttackeEingesetzt):
     damg = real_damage_calc(lobby, damage, attacke, target)
     await dmg(lobby, target, damg, attacke.owner)
     attacke.mod = 0
+    mons = []
     for mon in target.monster:
+        mons.append(mon)
+    for mon in mons:
         damage = real_damage_calc(lobby, damage, attacke, mon)
         await dmg(lobby, mon, damage, attacke.owner)
 
