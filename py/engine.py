@@ -307,7 +307,7 @@ geheimnis6 = Attacke(name="Geheimnis - Wenn du im Zug des Gegners keinen Schaden
 geheimnis7 = Attacke(name="Geheimnis - Wenn du Schaden bekommen würdest, verhindere 150 des Schadens",
                      text="Wenn du Schaden bekommen würdest, verhindere 150 des Schadens", type=2)
 
-geheimnis8 = Attacke(name="Geheimnis - Erhalte zu beginn deines Zuges zwei zufällige Geheimnissen",
+geheimnis8 = Attacke(name="Geheimnis - Erhalte zu beginn deines Zuges ein zufälliges Geheimnis",
                      text="Wähle zu Beginn deines Zuges erhalte ein zufälliges Geheimnis", type=2)
 
 geheimnis9 = Attacke(name="Geheimnis - Wenn ein Gegner dir tödlichen Schaden machen würde, verhindere jenen Schaden",
