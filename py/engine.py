@@ -130,7 +130,7 @@ Bitte_extra = Attacke(name="Bitte extra!", text="Kontere eine Extra Attacke", ke
                       type=0, targets=[0, 0, True, 0])
 Feuerkobold = Attacke(name="Feuerkobold", text='Beschwöre ein 0/50 Monster. Verursache 50 Schaden', keywords=[],
                       type=0, targets=[True, 0, 0, 0])
-Feurige_Waffen = Attacke(name="Feurige Waffen", text="Erhalte diesen Zug 10 Wut", keywords=[Einmalig, Extra], type=0)
+Feurige_Waffen = Attacke(name="Feurige Waffen", text="Erhalte 10 Wut", keywords=[Einmalig, Extra], type=0)
 Finale = Attacke(name="Finale", text="150 Schaden", keywords=[Einmalig], type=0, targets=[True, 0, 0, 0])
 Finales_Ritual = Attacke(name="Finales Ritual", text="(Menge dir Zugefügtem Schaden in deinem eigenen Zug) Schaden",
                          keywords=[Einmalig], type=0, targets=[True, 0, 0, 0])
@@ -1043,8 +1043,6 @@ async def attacken_ausführen(lobby: Lobby):
                             await damage(lobby, 50, atk)
                         case "Feurige Waffen":
                             atk.owner.stats.wut += 10
-                            lobby.events.append(
-                                Event((lobby.turntime // 5) * 5 + 5, AttackeEingesetzt(entferne_Wut, atk.owner)))
                         case "Finale":
                             await damage(lobby, 150, atk)
                         case "Finales Ritual":
