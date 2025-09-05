@@ -213,7 +213,7 @@ Verführerisches_Angebot = Attacke(name="Verführerisches Angebot",
 Verrat = Attacke(name="Verrat", text="80 Schaden", keywords=[Schnell], type=0, targets=[True, 0, 0, 0])
 Vorbereitung = Attacke(name="Vorbereitung", text="Deine nächste Attacke die Schadenmacht, verursacht +30 Schaden",
                        keywords=[], type=0)
-Wachsames_Auge = Attacke(name="Wachsames Auge (WIP)",
+Wachsames_Auge = Attacke(name="Wachsames Auge",
                          text="Dein Gegner verrät dir seine Attacken, wähle eine Attacke eines Gegners aus. Er kann sie für 2 "
                               "Züge nicht einsetzen",
                          keywords=[Einmalig, Extra], type=0)
