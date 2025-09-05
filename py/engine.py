@@ -1101,6 +1101,8 @@ async def attacken_ausführen(lobby: Lobby):
                                                         t_atk.last_used = (time // 5 + 1) * 5
                                                     else:
                                                         t_atk.last_used = (time // 5 - (not imt)) * 5
+                                        if key.category == 2:
+                                            allowed = False
                                     if allowed:
                                         t_atk.n_used += 1
                                         a,b,c,d = await ask_targets(lobby,client=lobby.clients[atk.owner.spieler_id].client,
