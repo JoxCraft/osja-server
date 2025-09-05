@@ -1238,7 +1238,7 @@ async def attacken_ausführen(lobby: Lobby):
                                 t_1, t_atk, _, _ = await ask_targets(lobby=lobby,
                                                                      client=lobby.clients[atk.owner.spieler_id].client,
                                                                      t_1=True, t_atk=True)
-                                lobby.stack.attacken.append(AttackeEingesetzt(attacke=dupe.attacke, owner=atk.owner, t_1=t_1,
+                                lobby.stack.attacken.append(AttackeEingesetzt(attacke=Attacke_blocken, owner=atk.owner, t_1=t_1,
                                                         t_atk=t_atk))
                                 await attacken_ausführen(lobby)
                             else:
