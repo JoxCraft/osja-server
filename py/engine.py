@@ -46,8 +46,7 @@ class Stats:
     wut: int = 0
     heil_wut: int = 0
     reduction: int = 0
-    atk_eingesetzt: (bool, bool) = (
-        False, False)  #vorher/nachher window, resettet am eigenen zuganfang dort nur window 1
+    atk_eingesetzt: (bool, bool) = (False, False)  #vorher/nachher window, resettet am eigenen zuganfang dort nur window 1
     # nutzbar
     dmgmod: int = 0
     n_selbstschaden: int = 0
@@ -622,7 +621,7 @@ def is_possible(keys: set[Keyword], last: int, n_used: int, zweite_chance: bool,
                 if (last - ((not is_my_turn) * (2 * (is_first_slot) - 1))) // 2 < key.value:
                     return False
                 # last = Differenz in ZÜGEN  seit letzter Nutzung.
-                # Eigener Zug:     last//2 <= key.value
+                # Eigener Zug:     last//2 < key.value
                 # Gegnerzug:       is_first_slot prüft, ob wir schon im nächsten Zeitfenster sind,
                 #                  Anpassung per ((not is_my_turn) * (2 * is_first_slot - 1))
             case 2:
@@ -1076,14 +1075,31 @@ async def attacken_ausführen(lobby: Lobby):
                                     id = t_1.spieler_id
                                     start = lobby.starting
                                     time = lobby.turntime
-                                    imt = ((time // 5) % 2 != (id == start))
-                                    is_main = imt and ((time % 5) == 2)
-                                    keys = set(t_atk.attacke.keywords) | set(t_atk.x_keywords)
+                                    last = time // 5 - t_atk.last_used // 5
                                     eingesetzt = t_1.stats.atk_eingesetzt
-                                    if is_possible(keys, time // 5 - t_atk.last_used // 5, t_atk.n_used,
-                                                   any(ab.attacke is Zweite_Chance for ab in t_1.stats.attacken),
-                                                   (not lobby.reaktion and is_main), imt, not eingesetzt[0],
-                                                   not (eingesetzt == (True, True))):
+                                    is_first_slot = not eingesetzt[0]
+                                    imt = ((time // 5) % 2 != (id == start))
+                                    keys = set(t_atk.attacke.keywords) | set(t_atk.x_keywords)
+                                    allowed = True
+                                    for key in keys:
+                                        if key.category == 0:
+                                            if t_atk.n_used >= key.value:
+                                                allowed = False
+                                        if key.category == 1:
+                                            if (last - ((not is_my_turn) * (2 * (is_first_slot) - 1))) // 2 < key.value:
+                                                allowed = False
+                                            else:
+                                                if Extra in keys:
+                                                    if eingesetzt == (True, True):
+                                                        t_atk.last_used = (time // 5 + 1) * 5
+                                                    else:
+                                                        t_atk.last_used = (time // 5 - (not imt)) * 5
+                                                else:
+                                                    if eingesetzt == (True, False):
+                                                        t_atk.last_used = (time // 5 + 1) * 5
+                                                    else:
+                                                        t_atk.last_used = (time // 5 - (not imt)) * 5
+                                    if allowed:
                                         t_atk.n_used += 1
                                         a,b,c,d = await ask_targets(lobby,client=lobby.clients[atk.owner.spieler_id].client,
                                                           t_1=t_atk.attacke.targets[0],t_atk=t_atk.attacke.targets[1],
