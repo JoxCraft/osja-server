@@ -338,6 +338,8 @@ Zauberkunstück_Teil3 = Attacke(name="Zauberkunstück - Teil 3/3", text="Wirke e
 
 Zyklus_des_Lebens_trigger = Attacke(name="Event - Zyklus des Lebens", text="Belebe ein Monster wider", type=2)
 
+Attacke_blocken = Attacke(name="Attacke für zwei Züge nicht einsetzbar", text="Attacke für zwei Züge nicht einsetzbar",type = 2, targets=[True,True,0,0]) 
+
 
 @dataclass
 class Client:
@@ -1236,34 +1238,9 @@ async def attacken_ausführen(lobby: Lobby):
                                 t_1, t_atk, _, _ = await ask_targets(lobby=lobby,
                                                                      client=lobby.clients[atk.owner.spieler_id].client,
                                                                      t_1=True, t_atk=True)
-                                if t_1.spieler_id != atk.owner.spieler_id:
-                                    keys = set(t_atk.attacke.keywords) | set(t_atk.x_keywords)
-                                    eingesetzt = t_1.stats.atk_eingesetzt
-                                    time = lobby.turntime
-                                    imt = is_my_turn(lobby, t_1)
-                                    if Extra in keys:
-                                        const = (time - t_atk.last_used) // 5
-                                        if imt:
-                                            if const > 0:
-                                                t_atk.last_used = (time // 5 + 2) * 5
-                                            else:
-                                                t_atk.last_used = (time // 5 + 4) * 5
-                                        else:
-                                            if const > 1:
-                                                t_atk.last_used = (time // 5 + 1) * 5
-                                            elif const > -1:
-                                                t_atk.last_used = (time // 5 + 3) * 5
-                                            else:
-                                                t_atk.last_used = (time // 5 + 5) * 5
-                                    else:
-                                        match eingesetzt:
-                                            case (False, False):
-                                                t_atk.last_used = (time // 5 + 2 - (not imt)) * 5
-                                            case (True, False):
-                                                t_atk.last_used = (time // 5 + 4 - (not imt)) * 5
-                                            case (True, True):
-                                                t_atk.last_used = (time // 5 + 5) * 5
-
+                                lobby.stack.attacken.append(AttackeEingesetzt(attacke=dupe.attacke, owner=atk.owner, t_1=t_1,
+                                                        t_atk=t_atk))
+                                await attacken_ausführen(lobby)
                             else:
                                 verraten(lobby, atk.owner)
                         case "Waffen weg!":
@@ -1347,6 +1324,34 @@ async def attacken_ausführen(lobby: Lobby):
                             await cst_rnd_secrt(lobby, atk.owner)
                         case Zyklus_des_Lebens_trigger.name:
                             resurrect(lobby, atk.owner, False)
+                        case "Attacke für zwei Züge nicht einsetzbar":
+                            if t_1.spieler_id != atk.owner.spieler_id:
+                                    keys = set(t_atk.attacke.keywords) | set(t_atk.x_keywords)
+                                    eingesetzt = t_1.stats.atk_eingesetzt
+                                    time = lobby.turntime
+                                    imt = is_my_turn(lobby, t_1)
+                                    if Extra in keys:
+                                        const = (time - t_atk.last_used) // 5
+                                        if imt:
+                                            if const > 0:
+                                                t_atk.last_used = (time // 5 + 2) * 5
+                                            else:
+                                                t_atk.last_used = (time // 5 + 4) * 5
+                                        else:
+                                            if const > 1:
+                                                t_atk.last_used = (time // 5 + 1) * 5
+                                            elif const > -1:
+                                                t_atk.last_used = (time // 5 + 3) * 5
+                                            else:
+                                                t_atk.last_used = (time // 5 + 5) * 5
+                                    else:
+                                        match eingesetzt:
+                                            case (False, False):
+                                                t_atk.last_used = (time // 5 + 2 - (not imt)) * 5
+                                            case (True, False):
+                                                t_atk.last_used = (time // 5 + 4 - (not imt)) * 5
+                                            case (True, True):
+                                                t_atk.last_used = (time // 5 + 5) * 5
                 if counter > 0:
                     counter -= 1
                 else:
