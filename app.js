@@ -343,9 +343,28 @@ const Host = {
           console.error("snapshot after message (remote) failed", e);
         }
       },
-      getcharactertarget: async () => Host.rpcAsk(remoteId, "getchar"),
-      getatktarget: async () => Host.rpcAsk(remoteId, "getatk"),
-      getstacktarget: async () => Host.rpcAsk(remoteId, "getstack"),
+      getcharactertarget: async () => {
+  try {
+    const snap = await Host.snapshot();
+    await broadcast("state", { ...snap, force: true });
+  } catch {}
+  return Host.rpcAsk(remoteId, "getchar");
+},
+getatktarget: async () => {
+  try {
+    const snap = await Host.snapshot();
+    await broadcast("state", { ...snap, force: true });
+  } catch {}
+  return Host.rpcAsk(remoteId, "getatk");
+},
+getstacktarget: async () => {
+  try {
+    const snap = await Host.snapshot();
+    await broadcast("state", { ...snap, force: true });
+  } catch {}
+  return Host.rpcAsk(remoteId, "getstack");
+},
+
       win: async () => { await broadcast("state", await Host.snapshot()); }
     };
   },
