@@ -1088,7 +1088,7 @@ async def attacken_ausführen(lobby: Lobby):
                                             if t_atk.n_used >= key.value:
                                                 allowed = False
                                         if key.category == 1:
-                                            if (last - ((not is_my_turn) * (2 * (is_first_slot) - 1))) // 2 < key.value:
+                                            if (last - ((not imt) * (2 * (is_first_slot) - 1))) // 2 < key.value:
                                                 allowed = False
                                             else:
                                                 if Extra in keys:
@@ -1325,33 +1325,33 @@ async def attacken_ausführen(lobby: Lobby):
                         case Zyklus_des_Lebens_trigger.name:
                             resurrect(lobby, atk.owner, False)
                         case "Attacke für zwei Züge nicht einsetzbar":
-                            if t_1.spieler_id != atk.owner.spieler_id:
-                                    keys = set(t_atk.attacke.keywords) | set(t_atk.x_keywords)
-                                    eingesetzt = t_1.stats.atk_eingesetzt
+                            if atk.t_1.spieler_id != atk.owner.spieler_id:
+                                    keys = set(atk.t_atk.attacke.keywords) | set(atk.t_atk.x_keywords)
+                                    eingesetzt = atk.t_1.stats.atk_eingesetzt
                                     time = lobby.turntime
-                                    imt = is_my_turn(lobby, t_1)
+                                    imt = is_my_turn(lobby, atk.t_1)
                                     if Extra in keys:
-                                        const = (time - t_atk.last_used) // 5
+                                        const = (time - atk.t_atk.last_used) // 5
                                         if imt:
                                             if const > 0:
-                                                t_atk.last_used = (time // 5 + 2) * 5
+                                                atk.t_atk.last_used = (time // 5 + 2) * 5
                                             else:
-                                                t_atk.last_used = (time // 5 + 4) * 5
+                                                atk.t_atk.last_used = (time // 5 + 4) * 5
                                         else:
                                             if const > 1:
-                                                t_atk.last_used = (time // 5 + 1) * 5
+                                                atk.t_atk.last_used = (time // 5 + 1) * 5
                                             elif const > -1:
-                                                t_atk.last_used = (time // 5 + 3) * 5
+                                                atk.t_atk.last_used = (time // 5 + 3) * 5
                                             else:
-                                                t_atk.last_used = (time // 5 + 5) * 5
+                                                atk.t_atk.last_used = (time // 5 + 5) * 5
                                     else:
                                         match eingesetzt:
                                             case (False, False):
-                                                t_atk.last_used = (time // 5 + 2 - (not imt)) * 5
+                                                atk.t_atk.last_used = (time // 5 + 2 - (not imt)) * 5
                                             case (True, False):
-                                                t_atk.last_used = (time // 5 + 4 - (not imt)) * 5
+                                                atk.t_atk.last_used = (time // 5 + 4 - (not imt)) * 5
                                             case (True, True):
-                                                t_atk.last_used = (time // 5 + 5) * 5
+                                                atk.t_atk.last_used = (time // 5 + 5) * 5
                 if counter > 0:
                     counter -= 1
                 else:
