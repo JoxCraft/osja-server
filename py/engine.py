@@ -47,7 +47,7 @@ class Stats:
     heil_wut: int = 0
     reduction: int = 0
     atk_eingesetzt: (bool, bool) = (
-    False, False)  #vorher/nachher window, resettet am eigenen zuganfang dort nur window 1
+        False, False)  #vorher/nachher window, resettet am eigenen zuganfang dort nur window 1
     # nutzbar
     dmgmod: int = 0
     n_selbstschaden: int = 0
@@ -135,7 +135,7 @@ Finale = Attacke(name="Finale", text="150 Schaden", keywords=[Einmalig], type=0,
 Finales_Ritual = Attacke(name="Finales Ritual", text="(Menge dir Zugefügtem Schaden in deinem eigenen Zug) Schaden",
                          keywords=[Einmalig], type=0, targets=[True, 0, 0, 0])
 Freund_der_Tiere = Attacke(name="Freund der Tiere", text="Beschwöre ein 50/50 Monster", keywords=[], type=0)
-Gedankenkontrolle = Attacke(name="Gedankenkontrolle (WIP)",
+Gedankenkontrolle = Attacke(name="Gedankenkontrolle",
                             text="Dein Gegner verrät dir seine Attacken. Wähle dann eine seiner Attacken, setze sie "
                                  "ein, so als würde sie der Gegner einsetzen",
                             keywords=[Dreimalig], type=0)
@@ -285,37 +285,45 @@ entferne_Schnell_Schaden = Attacke(name='Event - Effekt von "Schneller" abgelauf
 entferne_Wut = Attacke(name="Event - entferne Wut", text="entferne 10 Wut", type=2)
 
 geheimnis1 = Attacke(name="Geheimnis - Bevor ein Gegner dir durch eine Attacke Schaden macht, verursache 100 Schaden",
-                     text="Bevor ein Gegner dir Schaden durch eine Attacke macht, verursache 100 Schaden", type=2, targets=[True, 0, 0, 0])
-
-geheimnis2 = Attacke(name="Geheimnis - Wenn du im Zug eines Gegners keinen durch eine Attacke Schaden bekommst, verursache 100 Schaden",
-                     text="Wenn du im Zug eines Gegners keinen Schaden durch eine Attacke bekommst, verursache 100 Schaden", type=2,
+                     text="Bevor ein Gegner dir Schaden durch eine Attacke macht, verursache 100 Schaden", type=2,
                      targets=[True, 0, 0, 0])
 
-geheimnis3 = Attacke(name="Geheimnis - Wenn ein Gegner dir durch eine Attacke Schaden macht, heile 100 Leben",
-                     text="Wenn ein Gegner dir durch eine Attacke Schaden macht, heile 100 Leben", type=2, targets=[True, 0, 0, 0])
+geheimnis2 = Attacke(
+    name="Geheimnis - Wenn du im Zug eines Gegners keinen durch eine Attacke Schaden bekommst, verursache 100 Schaden",
+    text="Wenn du im Zug eines Gegners keinen Schaden durch eine Attacke bekommst, verursache 100 Schaden", type=2,
+    targets=[True, 0, 0, 0])
 
-geheimnis4 = Attacke(name="Geheimnis - Wenn du im Zug eines Gegners keinen Schaden durch eine Attacke bekommst, heile 100 Leben",
-                     text="Wenn du im Zug eines Gegners keinen Schaden durch eine Attacke bekommst, heile 100 Leben", type=2
-                     , targets=[True, 0, 0, 0])
+geheimnis3 = Attacke(name="Geheimnis - Wenn ein Gegner dir durch eine Attacke Schaden macht, heile 100 Leben",
+                     text="Wenn ein Gegner dir durch eine Attacke Schaden macht, heile 100 Leben", type=2,
+                     targets=[True, 0, 0, 0])
+
+geheimnis4 = Attacke(
+    name="Geheimnis - Wenn du im Zug eines Gegners keinen Schaden durch eine Attacke bekommst, heile 100 Leben",
+    text="Wenn du im Zug eines Gegners keinen Schaden durch eine Attacke bekommst, heile 100 Leben", type=2
+    , targets=[True, 0, 0, 0])
 
 geheimnis5 = Attacke(name="Geheimnis - Nachdem du Schaden durch eine Attacke bekommst, beschwöre ein 50/50 Monster",
                      text="Nachdem du Schaden durch eine Attacke bekommst, beschwöre ein 50/50 Monster", type=2)
 
-geheimnis6 = Attacke(name="Geheimnis - Wenn du im Zug des Gegners keinen Schaden durch eine Attacke bekommst, beschwöre ein 50/50 Monster",
-                     text="Wenn du im Zug des Gegners keinen Schaden durch eine Attacke bekommst, beschwöre ein 50/50 Monster", type=2)
+geheimnis6 = Attacke(
+    name="Geheimnis - Wenn du im Zug des Gegners keinen Schaden durch eine Attacke bekommst, beschwöre ein 50/50 Monster",
+    text="Wenn du im Zug des Gegners keinen Schaden durch eine Attacke bekommst, beschwöre ein 50/50 Monster", type=2)
 
-geheimnis7 = Attacke(name="Geheimnis - Wenn du durch eine Attacke des Gegners Schaden bekommen würdest, verhindere 150 des Schadens",
-                     text="Wenn du durch eine Attacke des Gegners Schaden bekommen würdest, verhindere 150 des Schadens", type=2)
+geheimnis7 = Attacke(
+    name="Geheimnis - Wenn du durch eine Attacke des Gegners Schaden bekommen würdest, verhindere 150 des Schadens",
+    text="Wenn du durch eine Attacke des Gegners Schaden bekommen würdest, verhindere 150 des Schadens", type=2)
 
 geheimnis8 = Attacke(name="Geheimnis - Erhalte zu beginn deines Zuges ein zufälliges Geheimnis",
                      text="Wähle zu Beginn deines Zuges erhalte ein zufälliges Geheimnis", type=2)
 
-geheimnis9 = Attacke(name="Geheimnis - Wenn ein Gegner dir durch eine Attacke tödlichen Schaden machen würde, verhindere jenen Schaden",
-                     text="Wenn ein Gegner dir durch eine Attacke tödlichen Schaden machen würde, verhindere jenen Schade", type=2)
+geheimnis9 = Attacke(
+    name="Geheimnis - Wenn ein Gegner dir durch eine Attacke tödlichen Schaden machen würde, verhindere jenen Schaden",
+    text="Wenn ein Gegner dir durch eine Attacke tödlichen Schaden machen würde, verhindere jenen Schade", type=2)
 
-geheimnis10 = Attacke(name="Geheimnis - Wenn ein Gegner dir durch eine Attacke Schaden verursachen würde, lenke den Schaden um",
-                      text="Geheimnis - Wenn ein Gegner dir durch eine Attacke Schaden verursachen würde, lenke den Schaden um",
-                      type=2, targets=[True, 0, 0, 0])
+geheimnis10 = Attacke(
+    name="Geheimnis - Wenn ein Gegner dir durch eine Attacke Schaden verursachen würde, lenke den Schaden um",
+    text="Geheimnis - Wenn ein Gegner dir durch eine Attacke Schaden verursachen würde, lenke den Schaden um",
+    type=2, targets=[True, 0, 0, 0])
 
 all_geheimnisse = [Geheimnis(geheimnis1, 0), Geheimnis(geheimnis2, 2), Geheimnis(geheimnis3, 1),
                    Geheimnis(geheimnis4, 2),
@@ -329,7 +337,7 @@ Zauberkunstück_Teil2 = Attacke(name="Zauberkunstück - Teil 2/3", text="Wirke e
 Zauberkunstück_Teil3 = Attacke(name="Zauberkunstück - Teil 3/3", text="Wirke eines der Geheimnisse von 1-7, du weißt"
                                                                       " genau welches", type=2)
 
-Zyklus_des_Lebens_trigger = Attacke(name="Event - Zyklus des Lebens", text="Belebe ein Monster wider",type=2)
+Zyklus_des_Lebens_trigger = Attacke(name="Event - Zyklus des Lebens", text="Belebe ein Monster wider", type=2)
 
 
 @dataclass
@@ -362,15 +370,15 @@ async def ask_targets(lobby: Lobby, client, t_1: bool = False, t_atk: bool = Fal
                       t_2: bool = False):
     old_prio = lobby.priority
     lobby.priority = [index for index, element in enumerate(lobby.clients) if element.client == client][0]
-    a: Spieler|Monster|None
-    b: AttackeBesitz|None
-    c: int|None
-    d: Spieler|Monster|None
+    a: Spieler | Monster | None
+    b: AttackeBesitz | None
+    c: int | None
+    d: Spieler | Monster | None
     a, b, c, d = None, None, None, None
     if t_atk:
         a, b = await client.getatktarget()
         if a == lobby.clients[lobby.priority].spieler:
-            if b not in lobby.clients[lobby.priority-1].spieler.atk_known:
+            if b not in lobby.clients[lobby.priority - 1].spieler.atk_known:
                 lobby.clients[lobby.priority - 1].spieler.atk_known.append(b)
     elif t_1:
         a = await client.getcharactertarget()
@@ -648,7 +656,8 @@ async def execute_geheimnis(lobby: Lobby, geheimnis: Geheimnis, owner: Spieler |
         old_prio = lobby.priority
         lobby.priority = owner.spieler_id
         for client in lobby.clients:
-            await client.client.message("Frage nach Zielen für " + geheimnis.attacke.name + " (" + lobby.clients[owner.spieler_id].spieler.name + ")")
+            await client.client.message("Frage nach Zielen für " + geheimnis.attacke.name + " (" + lobby.clients[
+                owner.spieler_id].spieler.name + ")")
         g_t = geheimnis.attacke.targets
         owner.stats.ausgelöst.append(geheimnis)
         owner.stats.geheimnisse.remove(geheimnis)
@@ -657,7 +666,7 @@ async def execute_geheimnis(lobby: Lobby, geheimnis: Geheimnis, owner: Spieler |
         )
         atk = AttackeEingesetzt(
             attacke=geheimnis.attacke, owner=owner,
-            t_1=t_1, t_atk=t_atk, t_stk=t_stk, t_2=t_2,mod=geheimnis.mod
+            t_1=t_1, t_atk=t_atk, t_stk=t_stk, t_2=t_2, mod=geheimnis.mod
         )
         lobby.stack.attacken.append(atk)
         lobby.priority = old_prio
@@ -698,7 +707,8 @@ async def dmg(lobby: Lobby, target: Spieler | Monster, damg: int, owner: Spieler
             await execute_geheimnis(lobby, reflect, target)
         elif target.stats.spiegelschilder > 0 and owner.spieler_id != target.spieler_id:
             target.stats.spiegelschilder -= 1
-            if not any(ab.attacke.name == Spiegelschild.name and kein_Schaden in ab.x_keywords  for ab in target.stats.attacken):
+            if not any(ab.attacke.name == Spiegelschild.name and kein_Schaden in ab.x_keywords for ab in
+                       target.stats.attacken):
                 await damage(lobby, damg, AttackeEingesetzt(attacke=Schwertschlag, owner=owner, t_1=owner))
             damg = 0
         elif damg >= target.stats.leben and iceblock and owner.spieler_id != target.spieler_id:
@@ -719,7 +729,7 @@ async def dmg(lobby: Lobby, target: Spieler | Monster, damg: int, owner: Spieler
             for geheimnis in after_dmg:
                 await execute_geheimnis(lobby, geheimnis, target)
             if target.is_monster:
-                await check_monster(lobby,target)
+                await check_monster(lobby, target)
             else:
                 await check_winner(lobby)
 
@@ -736,26 +746,26 @@ async def attacke_einsetzen(lobby: Lobby, owner: Spieler | Monster, attacke: Att
         if lobby.priority == id:
             start = lobby.starting
             time = lobby.turntime
-            is_my_turn = ((time // 5) % 2 != (id == start))
-            is_main = is_my_turn and ((time % 5) == 2)
+            imt = ((time // 5) % 2 != (id == start))
+            is_main = imt and ((time % 5) == 2)
             keys = set(attacke.attacke.keywords) | set(attacke.x_keywords)
             eingesetzt = owner.stats.atk_eingesetzt
             if is_possible(keys, time // 5 - attacke.last_used // 5, attacke.n_used,
                            any(ab.attacke is Zweite_Chance for ab in owner.stats.attacken),
-                           (not lobby.reaktion and is_main), is_my_turn, not eingesetzt[0],
+                           (not lobby.reaktion and is_main), imt, not eingesetzt[0],
                            not (eingesetzt == (True, True))):
                 attacke.n_used += 1
                 if Extra in keys:
                     if eingesetzt == (True, True):
                         attacke.last_used = (time // 5 + 1) * 5
                     else:
-                        attacke.last_used = (time // 5 - (not is_my_turn)) * 5
+                        attacke.last_used = (time // 5 - (not imt)) * 5
                 else:
                     if eingesetzt == (True, False):
                         attacke.last_used = (time // 5 + 1) * 5
                         owner.stats.atk_eingesetzt = (True, True)
                     else:
-                        attacke.last_used = (time // 5 - (not is_my_turn)) * 5
+                        attacke.last_used = (time // 5 - (not imt)) * 5
                         owner.stats.atk_eingesetzt = (True, False)
                 if kein_Schaden in keys:
                     e_atk = AttackeEingesetzt(attacke=attacke.attacke, owner=owner,
@@ -833,7 +843,8 @@ def real_damage_calc(lobby: Lobby, damage: int, attacke: AttackeEingesetzt, targ
                         if atk.attacke is Grüne_Wiese:
                             wiesen += 1
             return max(0, damage + owner.stats.wut + mod + lobby.atkmod - target.stats.reduction - (
-                    sum(ab.attacke is Metallschild for ab in target.stats.attacken) * 15) - (wiesen * 20)) * anzahl + attacke.mod
+                    sum(ab.attacke is Metallschild for ab in target.stats.attacken) * 15) - (
+                               wiesen * 20)) * anzahl + attacke.mod
 
 
 async def damage(lobby: Lobby, damage: int, attacke: AttackeEingesetzt, anzahl: int = 1):
@@ -876,26 +887,25 @@ def ist_konterbar(attacke: Attacke):
         return True
 
 
-async def zerstöre_monster(lobby:Lobby,monster: Monster):
+async def zerstöre_monster(lobby: Lobby, monster: Monster):
     monster.stats.leben = 0
-    await check_monster(lobby,monster)
+    await check_monster(lobby, monster)
 
 
-async def check_monster(lobby: Lobby, monster:Monster):
+async def check_monster(lobby: Lobby, monster: Monster):
     owner = lobby.clients[monster.spieler_id].spieler
-    zyklus=False
+    zyklus = False
     if monster.stats.leben <= 0:
         owner.monster.remove(monster)
         if not monster.stats.spott:
             if any(ab.attacke.name == Zyklus_des_Lebens.name for ab in owner.stats.attacken):
                 if len(owner.gy) > 0:
-                    zyklus=True
-                    lobby.stack.attacken.append(AttackeEingesetzt(attacke=Zyklus_des_Lebens_trigger,owner=owner))
+                    zyklus = True
+                    lobby.stack.attacken.append(AttackeEingesetzt(attacke=Zyklus_des_Lebens_trigger, owner=owner))
         if zyklus:
             await attacken_ausführen(lobby)
         else:
             owner.gy.append(monster)
-
 
 
 async def check_winner(lobby: Lobby):
@@ -1029,13 +1039,13 @@ async def attacken_ausführen(lobby: Lobby):
                                                                            lobby.clients[atk.owner.spieler_id].client,
                                                                            l_ask[0], l_ask[1], l_ask[2], l_ask[3])
                                 a_e = AttackeEingesetzt(attacke=dupe.attacke, owner=atk.owner, t_1=t_1,
-                                                                   t_atk=t_atk, t_stk=t_stk, t_2=t_2)
+                                                        t_atk=t_atk, t_stk=t_stk, t_2=t_2)
                                 a_e2 = AttackeEingesetzt(attacke=dupe.attacke, owner=atk.owner, t_1=t_1,
-                                                                   t_atk=t_atk, t_stk=t_stk, t_2=t_2)
-                                ev = Event(time=(lobby.turntime // 5) * 5 + 15 - (5 * is_my_turn(lobby,atk.owner)),
+                                                         t_atk=t_atk, t_stk=t_stk, t_2=t_2)
+                                ev = Event(time=(lobby.turntime // 5) * 5 + 15 - (5 * is_my_turn(lobby, atk.owner)),
                                            event=a_e)
                                 lobby.events.append(ev)
-                                lobby.events.append(replace(ev,event=a_e2))
+                                lobby.events.append(replace(ev, event=a_e2))
                         case "Alles wird gut!":
                             resurrect(lobby, atk.owner)
                             resurrect(lobby, atk.owner)
@@ -1056,9 +1066,43 @@ async def attacken_ausführen(lobby: Lobby):
                         case "Gedankenkontrolle":
                             if atk.attacke.type == 0:
                                 verraten(lobby, atk.owner)
+                                old_prio = lobby.priority
+                                lobby.priority = atk.owner.spieler_id
                                 t_1, t_atk, _, _ = await ask_targets(lobby,
-                                                                     client=lobby.clients[atk.owner.spieler_id].client,
+                                                                     client=lobby.clients[
+                                                                         atk.owner.spieler_id].client,
                                                                      t_atk=True, t_1=True)
+                                if t_1.spieler_id != atk.owner.spieler_id:
+                                    id = t_1.spieler_id
+                                    start = lobby.starting
+                                    time = lobby.turntime
+                                    imt = ((time // 5) % 2 != (id == start))
+                                    is_main = imt and ((time % 5) == 2)
+                                    keys = set(t_atk.attacke.keywords) | set(t_atk.x_keywords)
+                                    eingesetzt = t_1.stats.atk_eingesetzt
+                                    if is_possible(keys, time // 5 - t_atk.last_used // 5, t_atk.n_used,
+                                                   any(ab.attacke is Zweite_Chance for ab in t_1.stats.attacken),
+                                                   (not lobby.reaktion and is_main), imt, not eingesetzt[0],
+                                                   not (eingesetzt == (True, True))):
+                                        t_atk.n_used += 1
+                                        a,b,c,d = await ask_targets(lobby,client=lobby.clients[atk.owner.spieler_id].client,
+                                                          t_1=t_atk.attacke.targets[0],t_atk=t_atk.attacke.targets[1],
+                                                          t_stk=t_atk.attacke.targets[2],t_2=t_atk.attacke.targets[3])
+                                        if kein_Schaden in keys:
+                                            e_atk = AttackeEingesetzt(attacke=t_atk.attacke, owner=t_1,
+                                                                      t_1=a, t_atk=b, t_stk=c, t_2=d,
+                                                                      nodmg=True)
+                                        else:
+                                            e_atk = AttackeEingesetzt(attacke=t_atk.attacke, owner=t_1,
+                                                                      t_1=a, t_atk=b, t_stk=c, t_2=d)
+                                        lobby.stack.attacken.append(e_atk)
+                                        await attacken_ausführen(lobby)
+                                    else:
+                                        # vorher:
+                                        # await lobby.clients[id].client.message("Attacke nicht einsetzbar")
+                                        reason = "kein Priority" if lobby.priority != id else "Bedingungen (Fenster/Keywords) nicht erfüllt"
+                                        await lobby.clients[id].client.message(f"Attacke nicht einsetzbar – {reason}")
+                                lobby.priority = old_prio
                             else:
                                 atk.owner = atk.t_1
                                 await damage(lobby, 60, atk)
@@ -1125,7 +1169,7 @@ async def attacken_ausführen(lobby: Lobby):
                                 leben = atk.t_1.stats.leben
                                 sp = lobby.clients[atk.owner.spieler_id].spieler
                                 erhalte_leben(sp, leben)
-                                await zerstöre_monster(lobby,atk.t_1)
+                                await zerstöre_monster(lobby, atk.t_1)
                                 for mon in sp.monster:
                                     erhalte_leben(mon, leben)
                         case "Prestige":
@@ -1173,12 +1217,14 @@ async def attacken_ausführen(lobby: Lobby):
                         case "Wachsames Auge":
                             if atk.attacke.type == 0:
                                 verraten(lobby, atk.owner)
-                                t_1,t_atk,_,_ = await ask_targets(lobby=lobby,client=lobby.clients[atk.owner.spieler_id].client,t_1=True,t_atk=True)
+                                t_1, t_atk, _, _ = await ask_targets(lobby=lobby,
+                                                                     client=lobby.clients[atk.owner.spieler_id].client,
+                                                                     t_1=True, t_atk=True)
                                 if t_1.spieler_id != atk.owner.spieler_id:
                                     keys = set(t_atk.attacke.keywords) | set(t_atk.x_keywords)
                                     eingesetzt = t_1.stats.atk_eingesetzt
                                     time = lobby.turntime
-                                    imt = is_my_turn(lobby,t_1)
+                                    imt = is_my_turn(lobby, t_1)
                                     if Extra in keys:
                                         const = (time - t_atk.last_used) // 5
                                         if imt:
@@ -1195,11 +1241,11 @@ async def attacken_ausführen(lobby: Lobby):
                                                 t_atk.last_used = (time // 5 + 5) * 5
                                     else:
                                         match eingesetzt:
-                                            case (False,False):
-                                                t_atk.last_used = (time // 5 + 2 - (not imt))*5
-                                            case (True,False):
-                                                t_atk.last_used = (time // 5 + 4 - (not imt))*5
-                                            case (True,True):
+                                            case (False, False):
+                                                t_atk.last_used = (time // 5 + 2 - (not imt)) * 5
+                                            case (True, False):
+                                                t_atk.last_used = (time // 5 + 4 - (not imt)) * 5
+                                            case (True, True):
                                                 t_atk.last_used = (time // 5 + 5) * 5
 
                             else:
@@ -1284,7 +1330,7 @@ async def attacken_ausführen(lobby: Lobby):
                         case geheimnis8.name:
                             await cst_rnd_secrt(lobby, atk.owner)
                         case Zyklus_des_Lebens_trigger.name:
-                            resurrect(lobby,atk.owner,False)
+                            resurrect(lobby, atk.owner, False)
                 if counter > 0:
                     counter -= 1
                 else:
