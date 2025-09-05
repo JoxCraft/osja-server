@@ -176,7 +176,7 @@ Meister_der_Magie = Attacke(name="Meister der Magie", text="30*(Anzahl ausgelös
                             type=0, targets=[True, 0, 0, 0])
 Messerstich = Attacke(name="Messerstich", text="20 Schaden", keywords=[Extra], type=0, targets=[True, 0, 0, 0])
 Messerwürfe = Attacke(name="Messerwürfe", text="4 Mal 20 Schaden", keywords=[], type=0, targets=[True, 0, 0, 0])
-Metallschild = Attacke(name="Metallschild", text="Attacken des Gegners machen 10 Schaden weniger", keywords=[Passiv],
+Metallschild = Attacke(name="Metallschild", text="Attacken des Gegners machen 15 Schaden weniger", keywords=[Passiv],
                        type=0)
 Opfer = Attacke(name="Opfer",
                 text="Vernichte ein freundliches Monster. Alle befreundeten Charaktere erhalten seine Leben",
@@ -215,9 +215,9 @@ Verrat = Attacke(name="Verrat", text="80 Schaden", keywords=[Schnell], type=0, t
 Vorbereitung = Attacke(name="Vorbereitung", text="Deine nächste Attacke die Schadenmacht, verursacht +30 Schaden",
                        keywords=[], type=0)
 Wachsames_Auge = Attacke(name="Wachsames Auge (WIP)",
-                         text="Dein Gegner verrät dir seine Attacken, wähle eine von ihnen aus. Er kann sie für 2 "
+                         text="Dein Gegner verrät dir seine Attacken, wähle eine Attacke eines Gegners aus. Er kann sie für 2 "
                               "Züge nicht einsetzen",
-                         keywords=[Einmalig, Extra, Schnell], type=0)
+                         keywords=[Einmalig, Extra], type=0)
 Waffen_weg = Attacke(name="Waffen weg!", text="Dein Gegner führt alle seine Attacken aus, sie haben keinen Effekt",
                      keywords=[Einmalig, Extra], type=0)
 Wand = Attacke(name="Wand", text="Beschwöre ein 0/50 Monster mit Spott", keywords=[Zweimalig], type=0)
@@ -284,37 +284,37 @@ entferne_Schnell_Schaden = Attacke(name='Event - Effekt von "Schneller" abgelauf
                                    type=2)
 entferne_Wut = Attacke(name="Event - entferne Wut", text="entferne 10 Wut", type=2)
 
-geheimnis1 = Attacke(name="Geheimnis - Bevor ein Gegner dir Schaden macht, verursache 100 Schaden",
-                     text="Bevor ein Gegner dir Schaden macht, verursache 100 Schaden", type=2, targets=[True, 0, 0, 0])
+geheimnis1 = Attacke(name="Geheimnis - Bevor ein Gegner dir durch eine Attacke Schaden macht, verursache 100 Schaden",
+                     text="Bevor ein Gegner dir Schaden durch eine Attacke macht, verursache 100 Schaden", type=2, targets=[True, 0, 0, 0])
 
-geheimnis2 = Attacke(name="Geheimnis - Wenn du im Zug eines Gegners keinen Schaden bekommst, verursache 100 Schaden",
-                     text="Wenn du im Zug eines Gegners keinen Schaden bekommst, verursache 100 Schaden", type=2,
+geheimnis2 = Attacke(name="Geheimnis - Wenn du im Zug eines Gegners keinen durch eine Attacke Schaden bekommst, verursache 100 Schaden",
+                     text="Wenn du im Zug eines Gegners keinen Schaden durch eine Attacke bekommst, verursache 100 Schaden", type=2,
                      targets=[True, 0, 0, 0])
 
-geheimnis3 = Attacke(name="Geheimnis - Wenn ein Gegner dir Schaden macht, heile 100 Leben",
-                     text="Wenn ein Gegner dir Schaden macht, heile 100 Leben", type=2, targets=[True, 0, 0, 0])
+geheimnis3 = Attacke(name="Geheimnis - Wenn ein Gegner dir durch eine Attacke Schaden macht, heile 100 Leben",
+                     text="Wenn ein Gegner dir durch eine Attacke Schaden macht, heile 100 Leben", type=2, targets=[True, 0, 0, 0])
 
-geheimnis4 = Attacke(name="Geheimnis - Wenn du im Zug eines Gegners keinen Schaden bekommst, heile 100 Leben",
-                     text="Wenn du im Zug eines Gegners keinen Schaden bekommst, heile 100 Leben", type=2
+geheimnis4 = Attacke(name="Geheimnis - Wenn du im Zug eines Gegners keinen Schaden durch eine Attacke bekommst, heile 100 Leben",
+                     text="Wenn du im Zug eines Gegners keinen Schaden durch eine Attacke bekommst, heile 100 Leben", type=2
                      , targets=[True, 0, 0, 0])
 
-geheimnis5 = Attacke(name="Geheimnis - Nachdem du Schaden bekommst, beschwöre ein 50/50 Monster",
-                     text="Nachdem du Schaden bekommst, beschwöre ein 50/50 Monster", type=2)
+geheimnis5 = Attacke(name="Geheimnis - Nachdem du Schaden durch eine Attacke bekommst, beschwöre ein 50/50 Monster",
+                     text="Nachdem du Schaden durch eine Attacke bekommst, beschwöre ein 50/50 Monster", type=2)
 
-geheimnis6 = Attacke(name="Geheimnis - Wenn du im Zug des Gegners keinen Schaden bekommst, beschwöre ein 50/50 Monster",
-                     text="Wenn du im Zug des Gegners keinen Schaden bekommst, beschwöre ein 50/50 Monster", type=2)
+geheimnis6 = Attacke(name="Geheimnis - Wenn du im Zug des Gegners keinen Schaden durch eine Attacke bekommst, beschwöre ein 50/50 Monster",
+                     text="Wenn du im Zug des Gegners keinen Schaden durch eine Attacke bekommst, beschwöre ein 50/50 Monster", type=2)
 
-geheimnis7 = Attacke(name="Geheimnis - Wenn du Schaden bekommen würdest, verhindere 150 des Schadens",
-                     text="Wenn du Schaden bekommen würdest, verhindere 150 des Schadens", type=2)
+geheimnis7 = Attacke(name="Geheimnis - Wenn du durch eine Attacke des Gegners Schaden bekommen würdest, verhindere 150 des Schadens",
+                     text="Wenn du durch eine Attacke des Gegners Schaden bekommen würdest, verhindere 150 des Schadens", type=2)
 
 geheimnis8 = Attacke(name="Geheimnis - Erhalte zu beginn deines Zuges ein zufälliges Geheimnis",
                      text="Wähle zu Beginn deines Zuges erhalte ein zufälliges Geheimnis", type=2)
 
-geheimnis9 = Attacke(name="Geheimnis - Wenn ein Gegner dir tödlichen Schaden machen würde, verhindere jenen Schaden",
-                     text="Wenn ein Gegner dir tödlichen Schaden machen würde, verhindere jenen Schade", type=2)
+geheimnis9 = Attacke(name="Geheimnis - Wenn ein Gegner dir durch eine Attacke tödlichen Schaden machen würde, verhindere jenen Schaden",
+                     text="Wenn ein Gegner dir durch eine Attacke tödlichen Schaden machen würde, verhindere jenen Schade", type=2)
 
-geheimnis10 = Attacke(name="Geheimnis - Wenn ein Gegner dir Schaden verursachen würde, lenke den Schaden um",
-                      text="Geheimnis - Wenn ein Gegner dir Schaden verursachen würde, lenke den Schaden um",
+geheimnis10 = Attacke(name="Geheimnis - Wenn ein Gegner dir durch eine Attacke Schaden verursachen würde, lenke den Schaden um",
+                      text="Geheimnis - Wenn ein Gegner dir durch eine Attacke Schaden verursachen würde, lenke den Schaden um",
                       type=2, targets=[True, 0, 0, 0])
 
 all_geheimnisse = [Geheimnis(geheimnis1, 0), Geheimnis(geheimnis2, 2), Geheimnis(geheimnis3, 1),
@@ -362,6 +362,10 @@ async def ask_targets(lobby: Lobby, client, t_1: bool = False, t_atk: bool = Fal
                       t_2: bool = False):
     old_prio = lobby.priority
     lobby.priority = [index for index, element in enumerate(lobby.clients) if element.client == client][0]
+    a: Spieler|Monster|None
+    b: AttackeBesitz|None
+    c: int|None
+    d: Spieler|Monster|None
     a, b, c, d = None, None, None, None
     if t_atk:
         a, b = await client.getatktarget()
@@ -704,7 +708,7 @@ async def dmg(lobby: Lobby, target: Spieler | Monster, damg: int, owner: Spieler
             damg = 0
             target.stats.letzte_chancen -= 1
             heilen(lobby, AttackeEingesetzt(attacke=Heilung, owner=target, t_1=target), 50)
-        elif onefivezero and veränderbar:
+        elif onefivezero and veränderbar and owner.spieler_id != target.spieler_id:
             damg = max(0, damg - 150)
             await execute_geheimnis(lobby, onefivezero, target)
         if damg > 0:
@@ -817,7 +821,7 @@ def real_damage_calc(lobby: Lobby, damage: int, attacke: AttackeEingesetzt, targ
         owner.stats.dmgmod = 0
         if is_my_turn(lobby, owner):
             return max(0, damage + owner.stats.wut + mod + lobby.atkmod - target.stats.reduction - (
-                    sum(ab.attacke is Metallschild for ab in target.stats.attacken) * 10)) * anzahl + attacke.mod
+                    sum(ab.attacke is Metallschild for ab in target.stats.attacken) * 15)) * anzahl + attacke.mod
         else:
             wiesen = 0
             for client in lobby.clients:
@@ -829,7 +833,7 @@ def real_damage_calc(lobby: Lobby, damage: int, attacke: AttackeEingesetzt, targ
                         if atk.attacke is Grüne_Wiese:
                             wiesen += 1
             return max(0, damage + owner.stats.wut + mod + lobby.atkmod - target.stats.reduction - (
-                    sum(ab.attacke is Metallschild for ab in target.stats.attacken) * 10) - (wiesen * 20)) * anzahl + attacke.mod
+                    sum(ab.attacke is Metallschild for ab in target.stats.attacken) * 15) - (wiesen * 20)) * anzahl + attacke.mod
 
 
 async def damage(lobby: Lobby, damage: int, attacke: AttackeEingesetzt, anzahl: int = 1):
@@ -1028,7 +1032,7 @@ async def attacken_ausführen(lobby: Lobby):
                                                                    t_atk=t_atk, t_stk=t_stk, t_2=t_2)
                                 a_e2 = AttackeEingesetzt(attacke=dupe.attacke, owner=atk.owner, t_1=t_1,
                                                                    t_atk=t_atk, t_stk=t_stk, t_2=t_2)
-                                ev = Event(time=(lobby.turntime // 10) * 10 + 10,
+                                ev = Event(time=(lobby.turntime // 5) * 5 + 15 - (5 * is_my_turn(lobby,atk.owner)),
                                            event=a_e)
                                 lobby.events.append(ev)
                                 lobby.events.append(replace(ev,event=a_e2))
@@ -1168,7 +1172,36 @@ async def attacken_ausführen(lobby: Lobby):
                             dmg_mod(atk.owner, 30)
                         case "Wachsames Auge":
                             if atk.attacke.type == 0:
-                                pass
+                                verraten(lobby, atk.owner)
+                                t_1,t_atk,_,_ = await ask_targets(lobby=lobby,client=lobby.clients[atk.owner.spieler_id].client,t_1=True,t_atk=True)
+                                if t_1.spieler_id != atk.owner.spieler_id:
+                                    keys = set(t_atk.attacke.keywords) | set(t_atk.x_keywords)
+                                    eingesetzt = t_1.stats.atk_eingesetzt
+                                    time = lobby.turntime
+                                    imt = is_my_turn(lobby,t_1)
+                                    if Extra in keys:
+                                        const = (time - t_atk.last_used) // 5
+                                        if imt:
+                                            if const > 0:
+                                                t_atk.last_used = (time // 5 + 2) * 5
+                                            else:
+                                                t_atk.last_used = (time // 5 + 4) * 5
+                                        else:
+                                            if const > 1:
+                                                t_atk.last_used = (time // 5 + 1) * 5
+                                            elif const > -1:
+                                                t_atk.last_used = (time // 5 + 3) * 5
+                                            else:
+                                                t_atk.last_used = (time // 5 + 5) * 5
+                                    else:
+                                        match eingesetzt:
+                                            case (False,False):
+                                                t_atk.last_used = (time // 5 + 2 - (not imt))*5
+                                            case (True,False):
+                                                t_atk.last_used = (time // 5 + 4 - (not imt))*5
+                                            case (True,True):
+                                                t_atk.last_used = (time // 5 + 5) * 5
+
                             else:
                                 verraten(lobby, atk.owner)
                         case "Waffen weg!":
