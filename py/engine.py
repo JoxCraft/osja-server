@@ -288,7 +288,7 @@ geheimnis1 = Attacke(name="Geheimnis - Bevor ein Gegner dir durch eine Attacke S
                      targets=[True, 0, 0, 0])
 
 geheimnis2 = Attacke(
-    name="Geheimnis - Wenn du im Zug eines Gegners keinen durch eine Attacke Schaden bekommst, verursache 100 Schaden",
+    name="Geheimnis - Wenn du im Zug eines Gegners keinen Schaden durch eine Attacke bekommst, verursache 100 Schaden",
     text="Wenn du im Zug eines Gegners keinen Schaden durch eine Attacke bekommst, verursache 100 Schaden", type=2,
     targets=[True, 0, 0, 0])
 
